@@ -1,26 +1,127 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-court-950: #08261c;
+  --color-court-900: #0e3b2c;
+  --color-court-800: #13503b;
+  --color-court-700: #1a674c;
+  --color-court-600: #23805f;
+  --color-court-200: #bcdcc9;
+  --color-court-100: #d9eadf;
+  --color-court-50: #edf5f0;
+  --color-clay-700: #95391a;
+  --color-clay-600: #b04a26;
+  --color-clay-500: #c85d34;
+  --color-clay-100: #f6e0d5;
+  --color-clay-50: #fbf0ea;
+  --color-ball: #d8f24b;
+  --color-ball-dark: #b9d52a;
+  --color-cream: #f7f3ea;
+  --color-sand: #ece5d5;
+  --color-line: #ddd4c0;
+  --color-ink: #13211b;
+  --color-muted: #5b6961;
+
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-court-600);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+  }
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-court-900 text-cream hover:bg-court-800;
+  }
+  .btn-ball {
+    @apply bg-ball text-court-950 hover:bg-ball-dark;
+  }
+  .btn-ghost {
+    @apply border border-line bg-white text-ink hover:border-court-700 hover:text-court-800;
+  }
+  .btn-danger {
+    @apply bg-clay-600 text-white hover:bg-clay-700;
+  }
+  .btn-sm {
+    @apply px-3.5 py-1.5 text-xs;
+  }
+  .card {
+    @apply rounded-2xl border border-line bg-white;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink;
+  }
+  .input {
+    @apply w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-muted/60 focus:border-court-600 focus:outline-none focus:ring-2 focus:ring-court-600/20;
+  }
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-clay-600;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes bounce-ball {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-18px);
+  }
+}
+.ball-bounce {
+  animation: bounce-ball 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .ball-bounce {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
 }

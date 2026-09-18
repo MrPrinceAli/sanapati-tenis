@@ -1,0 +1,48 @@
+import "server-only";
+import { cache } from "react";
+import { db } from "./db";
+import { DEFAULT_RULES, RULE_BOUNDS, type Rules } from "./rules";
+
+export type SiteSettings = Rules & {
+  registrationOpen: boolean;
+  announcementId: string;
+  announcementEn: string;
+  contactEmail: string;
+};
+
+const DEFAULTS: SiteSettings = {
+  ...DEFAULT_RULES,
+  registrationOpen: true,
+  announcementId: "",
+  announcementEn: "",
+  contactEmail: "halo@sanapati.id",
+};
+
+// Dibaca sekali per request. Nilai yang rusak/di luar batas jatuh kembali ke default, bukan membuat situs error.
+export const getSettings = cache((): SiteSettings => {
+  const rows = db.prepare("SELECT key, value FROM settings").all() as { key: string; value: string }[];
+  const stored = new Map(rows.map((r) => [r.key, r.value]));
+  const out = { ...DEFAULTS };
+  for (const key of Object.keys(RULE_BOUNDS) as (keyof Rules)[]) {
+    const n = Number(stored.get(key));
+    const [min, max] = RULE_BOUNDS[key];
+    if (stored.has(key) && Number.isInteger(n) && n >= min && n <= max) out[key] = n;
+  }
+  if (stored.has("registrationOpen")) out.registrationOpen = stored.get("registrationOpen") === "1";
+  for (const key of ["announcementId", "announcementEn", "contactEmail"] as const) {
+    if (stored.has(key)) out[key] = stored.get(key)!;
+  }
+  return out;
+});
+
+export const getRules = (): Rules => {
+  const { maxDaysAhead, maxDuration, cancelLimitHours, maxActiveBookings } = getSettings();
+  return { maxDaysAhead, maxDuration, cancelLimitHours, maxActiveBookings };
+};
+
+export function saveSettings(values: SiteSettings) {
+  const upsert = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+  db.transaction(() => {
+    for (const [key, value] of Object.entries(values)) upsert.run(key, typeof value === "boolean" ? (value ? "1" : "0") : String(value));
+  })();
+}
