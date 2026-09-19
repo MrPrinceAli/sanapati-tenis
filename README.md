@@ -2,6 +2,34 @@
 
 Website komunitas tenis dengan booking lapangan online — **gratis** (tanpa harga/pembayaran), dua lapangan: **Sawangan** dan **Ragunan**, dua bahasa (Indonesia/Inggris). Next.js 15 (App Router) + TypeScript + Tailwind CSS v4 + SQLite (file lokal, atau Turso di produksi).
 
+> **Live:** https://sanapati-tenis.vercel.app
+
+## Tampilan
+
+![Halaman depan](docs/screenshots/landing.png)
+
+| Booking | Jadwal (kalender) |
+| --- | --- |
+| ![Papan booking](docs/screenshots/booking.png) | ![Kalender](docs/screenshots/jadwal.png) |
+| Papan lapangan × jam. Slot hijau bisa diklik; jam yang dipakai jadwal rutin klub tertutup otomatis. | Kalender bulanan dengan bar kepadatan, plus rincian per jam untuk tanggal yang dipilih. |
+
+| Mabar / matchmaking | Galeri |
+| --- | --- |
+| ![Mabar](docs/screenshots/mabar.png) | ![Galeri](docs/screenshots/galeri.png) |
+| Masukkan nama, sistem mengacak pasangan & lawan secara adil, lalu skor dan klasemen terisi otomatis. | Filter kategori dengan lightbox. |
+
+| Admin — ringkasan | Admin — jadwal rutin mingguan |
+| --- | --- |
+| ![Dashboard admin](docs/screenshots/admin.png) | ![Jadwal rutin](docs/screenshots/admin-jadwal-rutin.png) |
+| Statistik harian, grafik jam terbooking, okupansi per lapangan. | Sekali atur, jam yang sama tertutup setiap minggu. |
+
+**Tampilan di HP**
+
+<p>
+  <img src="docs/screenshots/hp-landing.png" alt="Halaman depan di HP" width="270">
+  <img src="docs/screenshots/hp-booking.png" alt="Booking di HP" width="270">
+</p>
+
 ## Menjalankan
 
 ```bash
