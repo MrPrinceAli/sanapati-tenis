@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function AdminGallery() {
   const { t } = await getI18n();
-  const items = db.prepare("SELECT * FROM gallery ORDER BY id DESC").all() as GalleryItem[];
+  const items = await db.all("SELECT * FROM gallery ORDER BY id DESC") as GalleryItem[];
   return (
     <>
       <p className="eyebrow">{t.admin.tabs.gallery}</p>

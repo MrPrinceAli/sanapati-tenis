@@ -15,7 +15,7 @@ export async function bookSlot(_: FormState, form: FormData): Promise<FormState>
 
   let code: string;
   try {
-    const booking = createBooking({
+    const booking = await createBooking({
       user,
       courtId: Number(form.get("courtId")),
       date: String(form.get("date") ?? ""),
@@ -41,7 +41,7 @@ export async function cancelMyBooking(_: FormState, form: FormData): Promise<For
   const detail = String(form.get("detail") ?? "").trim();
   if (!CANCEL_REASONS.includes(reason)) return { error: t.errors.chooseReason };
   try {
-    cancelBooking(Number(form.get("bookingId")), user, detail ? `${reason} — ${detail}` : reason);
+    await cancelBooking(Number(form.get("bookingId")), user, detail ? `${reason} — ${detail}` : reason);
   } catch (e) {
     if (e instanceof BookingError) return { error: t.errors[e.code] };
     throw e;

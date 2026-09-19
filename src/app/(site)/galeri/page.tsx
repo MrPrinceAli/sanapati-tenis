@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function GalleryPage() {
   const { t } = await getI18n();
-  const items = db.prepare("SELECT id, title, category, src FROM gallery ORDER BY id DESC").all() as GalleryItem[];
+  const items = await db.all("SELECT id, title, category, src FROM gallery ORDER BY id DESC") as GalleryItem[];
   return (
     <div className="container-page pt-10">
       <p className="eyebrow">{t.gallery.eyebrow}</p>

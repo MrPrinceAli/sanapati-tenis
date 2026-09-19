@@ -125,3 +125,236 @@ h3 {
     scroll-behavior: auto;
   }
 }
+
+/* ==========================================================================
+   Landing page scroll-driven. ScrollScene menulis --p (0..1) dan data-step;
+   semua gerak di bawah ini hanya transform/opacity supaya tetap mulus.
+   ========================================================================== */
+.scene {
+  --p: 0;
+  position: relative;
+}
+.scene-pin {
+  height: calc(var(--screens) * (100dvh - 4rem));
+}
+.scene-sticky {
+  position: sticky;
+  top: 4rem;
+  height: calc(100dvh - 4rem);
+  overflow: hidden;
+}
+
+/* --- Hero: kamera terbang dari sudut miring ke tampak atas --- */
+.hero-court {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: calc(0.3 + var(--p) * 0.7);
+  transform: perspective(1100px) rotateX(calc(66deg - var(--p) * 66deg)) translateY(calc(22% - var(--p) * 22%))
+    scale(calc(0.9 + var(--p) * 0.75));
+  transform-origin: 50% 62%;
+  will-change: transform;
+}
+.hero-court svg {
+  width: min(118vw, 64rem);
+  height: auto;
+}
+.hero-court .draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: max(0, calc(1 - var(--p) * 2.4));
+}
+.hero-copy {
+  opacity: clamp(0, calc(1 - var(--p) * 2.8), 1);
+  transform: translateY(calc(var(--p) * -110px));
+}
+.scene[data-step="1"] .hero-copy {
+  pointer-events: none;
+}
+.hero-next {
+  opacity: clamp(0, calc((var(--p) - 0.5) * 4), 1);
+  transform: translateY(calc((1 - var(--p)) * 70px));
+}
+.scene[data-step="0"] .hero-next {
+  pointer-events: none;
+}
+/* Lapisan gelap di belakang pesan kedua supaya teks tidak bertabrakan dengan garis putih lapangan. */
+.hero-scrim {
+  background: radial-gradient(ellipse 60% 55% at 50% 50%, rgba(8, 38, 28, 0.82), rgba(8, 38, 28, 0.35) 70%, transparent);
+  opacity: clamp(0, calc((var(--p) - 0.45) * 3), 1);
+  pointer-events: none;
+}
+/* Lob: x linear, y parabola (puncak di tengah perjalanan). */
+.hero-ball {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  transform: translate(
+      calc(-50% + (var(--p) - 0.5) * 84vw),
+      calc(-50% + (var(--p) - 0.5) * (var(--p) - 0.5) * 150dvh - 37dvh)
+    )
+    rotate(calc(var(--p) * 900deg));
+  will-change: transform;
+}
+.hero-hint {
+  opacity: clamp(0, calc(1 - var(--p) * 8), 1);
+}
+
+/* --- Cara booking: langkah diskret lewat data-step --- */
+.step-rail-fill {
+  transform: scaleY(var(--p));
+  transform-origin: top;
+}
+.step-item {
+  opacity: 0.32;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+.scene[data-step="0"] .step-item[data-i="0"],
+.scene[data-step="1"] .step-item[data-i="1"],
+.scene[data-step="2"] .step-item[data-i="2"] {
+  opacity: 1;
+  transform: translateX(6px);
+}
+/* HP: layar pendek, jadi hanya langkah aktif yang ditampilkan supaya mockup di bawahnya tetap muat. */
+@media (max-width: 767px) {
+  .step-item {
+    display: none;
+  }
+  .scene[data-step="0"] .step-item[data-i="0"],
+  .scene[data-step="1"] .step-item[data-i="1"],
+  .scene[data-step="2"] .step-item[data-i="2"] {
+    display: block;
+    transform: none;
+  }
+}
+.mock-date,
+.mock-slot,
+.mock-ticket {
+  transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease, transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.45s ease;
+}
+.scene .mock-date.is-target {
+  border-color: var(--color-court-900);
+  background: var(--color-court-900);
+  color: var(--color-cream);
+}
+.scene:is([data-step="1"], [data-step="2"]) .mock-slot.is-target {
+  border-color: var(--color-court-900);
+  background: var(--color-court-900);
+  color: var(--color-cream);
+}
+.scene[data-step="2"] .mock-slot.is-target {
+  border-color: var(--color-ball);
+  background: var(--color-ball);
+  color: var(--color-court-950);
+}
+/* Label slot target mengikuti langkah: Kosong → ✓ (dipilih) → Kamu (terbooking). */
+.mock-slot .when-1,
+.mock-slot .when-2,
+.scene:is([data-step="1"], [data-step="2"]) .mock-slot .when-0,
+.scene[data-step="2"] .mock-slot .when-1 {
+  display: none;
+}
+.scene[data-step="1"] .mock-slot .when-1,
+.scene[data-step="2"] .mock-slot .when-2 {
+  display: inline;
+}
+.mock-ticket {
+  opacity: 0;
+  transform: translateY(115%) rotate(-2deg);
+}
+.scene[data-step="2"] .mock-ticket {
+  opacity: 1;
+  transform: translateY(0) rotate(-2deg);
+}
+
+/* --- Lapangan: scroll vertikal menggeser panel horizontal --- */
+.h-track {
+  display: flex;
+  height: 100%;
+  transform: translate3d(calc(var(--p) * (var(--n) - 1) * -100vw), 0, 0);
+  will-change: transform;
+}
+.h-panel {
+  width: 100vw;
+  flex: none;
+}
+.h-progress {
+  transform: scaleX(var(--p));
+  transform-origin: left;
+}
+
+/* --- Parallax & CTA --- */
+.parallax {
+  transform: translateY(calc((var(--p) - 0.5) * var(--speed, -80px)));
+  will-change: transform;
+}
+.cta-ball {
+  transform: translateX(calc((var(--p) - 0.55) * 90vw)) rotate(calc(var(--p) * 1080deg));
+  will-change: transform;
+}
+
+/* --- Reveal saat masuk layar (hanya aktif kalau JS jalan: lihat ScrollChrome) --- */
+.reveal-ready [data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s ease, transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--d, 0) * 90ms);
+}
+.reveal-ready [data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Animasi dimatikan: tidak ada pin, tidak ada geser horizontal; semua konten tampil berurutan seperti halaman biasa. */
+@media (prefers-reduced-motion: reduce) {
+  .scene-pin {
+    height: auto;
+  }
+  .scene-sticky {
+    position: static;
+    height: auto;
+    overflow: visible;
+  }
+  .hero-court {
+    opacity: 0.35;
+    transform: none;
+  }
+  .hero-court .draw {
+    stroke-dashoffset: 0;
+  }
+  .hero-copy,
+  .hero-next {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto !important;
+  }
+  .hero-ball,
+  .hero-hint,
+  .hero-scrim,
+  .cta-ball {
+    display: none;
+  }
+  .step-item {
+    display: block !important;
+    opacity: 1;
+    transform: none !important;
+  }
+  .h-track {
+    flex-direction: column;
+    height: auto;
+    transform: none;
+  }
+  .h-panel {
+    width: 100%;
+  }
+  .parallax {
+    transform: none;
+  }
+  .reveal-ready [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

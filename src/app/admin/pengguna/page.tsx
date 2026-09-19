@@ -30,16 +30,12 @@ type Row = {
 export default async function AdminUsers() {
   const { t, f } = await getI18n();
   const u = t.admin.users;
-  const users = db
-    .prepare(
-      `SELECT u.id, u.name, u.email, u.phone, u.role, u.level, u.avatar_hue, u.avatar, u.suspended, u.created_at,
+  const users = await db.all(`SELECT u.id, u.name, u.email, u.phone, u.role, u.level, u.avatar_hue, u.avatar, u.suspended, u.created_at,
               COUNT(CASE WHEN b.status = 'confirmed' AND b.kind = 'booking' THEN 1 END) AS bookings,
               COUNT(b.id) AS all_bookings,
               COALESCE(SUM(CASE WHEN b.status = 'confirmed' AND b.kind = 'booking' THEN b.end_hour - b.start_hour END), 0) AS hours
        FROM users u LEFT JOIN bookings b ON b.user_id = u.id
-       GROUP BY u.id ORDER BY u.role = 'admin' DESC, hours DESC`
-    )
-    .all() as Row[];
+       GROUP BY u.id ORDER BY u.role = 'admin' DESC, hours DESC`) as Row[];
 
   return (
     <>

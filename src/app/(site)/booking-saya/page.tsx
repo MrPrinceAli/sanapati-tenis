@@ -20,7 +20,7 @@ function StatusBadge({ b, t }: { b: BookingRow; t: Dict }) {
   return <span className="badge bg-court-100 text-court-800">{t.my.stConfirmed}</span>;
 }
 
-function BookingCard({ b, upcoming, t, f }: { b: BookingRow; upcoming: boolean; t: Dict; f: Formatters }) {
+function BookingCard({ b, upcoming, t, f, cancelLimit }: { b: BookingRow; upcoming: boolean; t: Dict; f: Formatters; cancelLimit: number }) {
   return (
     <li className={`card p-5 ${upcoming ? "" : "bg-white/60"}`}>
       <div className="flex flex-wrap items-center gap-2">
@@ -47,7 +47,7 @@ function BookingCard({ b, upcoming, t, f }: { b: BookingRow; upcoming: boolean; 
           <a href={`/api/bookings/${b.code}/ics`} className="btn btn-ghost btn-sm">
             {t.my.addCalendar}
           </a>
-          {canUserCancel(b) ? (
+          {canUserCancel(b, cancelLimit) ? (
             <CancelDialog bookingId={b.id} summary={`${b.court_name} · ${f.dateLong(b.date)} · ${f.range(b.start_hour, b.end_hour)}`} />
           ) : (
             <span className="text-xs text-muted">{t.my.tooLate}</span>
@@ -61,8 +61,8 @@ function BookingCard({ b, upcoming, t, f }: { b: BookingRow; upcoming: boolean; 
 export default async function MyBookingsPage({ searchParams }: { searchParams: Promise<{ baru?: string }> }) {
   const user = await requireUser("/booking-saya");
   const { baru } = await searchParams;
-  const { t, f } = await getI18n();
-  const all = getUserBookings(user.id);
+  const { t, f, rules } = await getI18n();
+  const all = await getUserBookings(user.id);
   const upcoming = all.filter((b) => b.status === "confirmed" && !isPast(b)).reverse();
   const history = all.filter((b) => b.status === "cancelled" || isPast(b));
   const created = baru ? upcoming.find((b) => b.code === baru) : undefined;
@@ -114,7 +114,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: P
         ) : (
           <ul className="mt-4 space-y-3">
             {upcoming.map((b) => (
-              <BookingCard key={b.id} b={b} upcoming t={t} f={f} />
+              <BookingCard key={b.id} b={b} upcoming t={t} f={f} cancelLimit={rules.cancelLimitHours} />
             ))}
           </ul>
         )}
@@ -125,7 +125,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: P
           <h2 className="text-2xl font-semibold">{t.my.history}</h2>
           <ul className="mt-4 space-y-3">
             {history.slice(0, 20).map((b) => (
-              <BookingCard key={b.id} b={b} upcoming={false} t={t} f={f} />
+              <BookingCard key={b.id} b={b} upcoming={false} t={t} f={f} cancelLimit={rules.cancelLimitHours} />
             ))}
           </ul>
         </section>

@@ -18,7 +18,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
       <div className="w-full max-w-lg">
         <p className="eyebrow">{t.auth.regEyebrow}</p>
         <h1 className="mt-2 text-4xl font-bold">{t.auth.regTitle}</h1>
-        {getSettings().registrationOpen ? (
+        {(await getSettings()).registrationOpen ? (
           <div className="card mt-8 p-6">
             <RegisterForm next={next ? safeNext(next, "") : ""} />
           </div>

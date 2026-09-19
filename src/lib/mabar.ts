@@ -67,14 +67,13 @@ export const canManage = (session: MMSession, user: User | null) =>
 export const canContribute = (session: MMSession, user: User | null) =>
   canManage(session, user) || (!!session.open_edit && !session.finished);
 
-export function getSession(id: number): MMSession | undefined {
+export async function getSession(id: number): Promise<MMSession | undefined> {
   if (!Number.isInteger(id)) return undefined;
-  return db.prepare("SELECT * FROM mm_sessions WHERE id = ?").get(id) as MMSession | undefined;
+  return db.get<MMSession>("SELECT * FROM mm_sessions WHERE id = ?", id);
 }
-export const getPlayers = (sessionId: number) =>
-  db.prepare("SELECT * FROM mm_players WHERE session_id = ? ORDER BY id").all(sessionId) as MMPlayerRow[];
+export const getPlayers = (sessionId: number) => db.all<MMPlayerRow>("SELECT * FROM mm_players WHERE session_id = ? ORDER BY id", sessionId);
 export const getMatches = (sessionId: number) =>
-  db.prepare("SELECT * FROM mm_matches WHERE session_id = ? ORDER BY round, slot").all(sessionId) as MMMatch[];
+  db.all<MMMatch>("SELECT * FROM mm_matches WHERE session_id = ? ORDER BY round, slot", sessionId);
 
 export function standingsFor(players: MMPlayerRow[], matches: MMMatch[]): Standing[] {
   return standings(
@@ -104,17 +103,26 @@ export type SessionCard = {
   headline: string[];
 };
 
-export function listSessions(limit = 60): SessionCard[] {
-  const sessions = db
-    .prepare(
-      `SELECT s.*, u.name AS owner_name FROM mm_sessions s JOIN users u ON u.id = s.owner_id
-       ORDER BY s.play_date DESC, s.id DESC LIMIT ?`
-    )
-    .all(limit) as (MMSession & { owner_name: string })[];
+export async function listSessions(limit = 60): Promise<SessionCard[]> {
+  const sessions = await db.all<MMSession & { owner_name: string }>(
+    `SELECT s.*, u.name AS owner_name FROM mm_sessions s JOIN users u ON u.id = s.owner_id
+     ORDER BY s.play_date DESC, s.id DESC LIMIT ?`,
+    limit
+  );
+  if (sessions.length === 0) return [];
+
+  // Pemain & pertandingan semua sesi diambil dalam dua query (bukan dua query per sesi):
+  // dengan database di cloud, jumlah round-trip jauh lebih menentukan kecepatan daripada ukuran hasilnya.
+  const ids = sessions.map((x) => x.id);
+  const marks = ids.map(() => "?").join(",");
+  const [allPlayers, allMatches] = await Promise.all([
+    db.all<MMPlayerRow>(`SELECT * FROM mm_players WHERE session_id IN (${marks}) ORDER BY id`, ...ids),
+    db.all<MMMatch>(`SELECT * FROM mm_matches WHERE session_id IN (${marks}) ORDER BY round, slot`, ...ids),
+  ]);
 
   return sessions.map((session) => {
-    const players = getPlayers(session.id);
-    const matches = getMatches(session.id);
+    const players = allPlayers.filter((p) => p.session_id === session.id);
+    const matches = allMatches.filter((m) => m.session_id === session.id);
     const real = matches.filter((m) => !m.is_bye);
     const name = (id: number) => players.find((p) => p.id === id)?.name ?? "?";
     let headline: string[] = [];

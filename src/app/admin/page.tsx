@@ -22,21 +22,22 @@ export default async function AdminOverview() {
   const o = t.admin.overview;
   const today = todayWIB();
   const month = `${today.slice(0, 7)}-%`;
-  const courts = getCourts();
+  const courts = await getCourts();
   const capacityToday = courts.reduce((sum, c) => sum + c.close_hour - c.open_hour, 0);
 
-  const one = <T,>(sql: string, ...args: unknown[]) => db.prepare(sql).get(...args) as T;
-  const todayAgg = one<{ n: number; hours: number }>(
+  // Query agregat (COUNT/SUM) selalu mengembalikan tepat satu baris.
+  const one = async <T,>(sql: string, ...args: unknown[]) => (await db.get<T>(sql, ...args))!;
+  const todayAgg = await one<{ n: number; hours: number }>(
     "SELECT COUNT(*) AS n, COALESCE(SUM(end_hour - start_hour), 0) AS hours FROM bookings WHERE date = ? AND status = 'confirmed' AND kind = 'booking'",
     today
   );
-  const monthAgg = one<{ confirmed: number; cancelled: number }>(
+  const monthAgg = await one<{ confirmed: number; cancelled: number }>(
     `SELECT COUNT(CASE WHEN status = 'confirmed' THEN 1 END) AS confirmed,
             COUNT(CASE WHEN status = 'cancelled' THEN 1 END) AS cancelled
      FROM bookings WHERE date LIKE ? AND kind = 'booking'`,
     month
   );
-  const members = one<{ n: number; fresh: number }>(
+  const members = await one<{ n: number; fresh: number }>(
     "SELECT COUNT(*) AS n, COUNT(CASE WHEN created_at LIKE ? THEN 1 END) AS fresh FROM users WHERE role = 'user'",
     month
   );
@@ -44,12 +45,8 @@ export default async function AdminOverview() {
   const from = addDays(today, -13);
   const perDay = new Map(
     (
-      db
-        .prepare(
-          `SELECT date, SUM(end_hour - start_hour) AS hours FROM bookings
-           WHERE date BETWEEN ? AND ? AND status = 'confirmed' AND kind = 'booking' GROUP BY date`
-        )
-        .all(from, today) as { date: string; hours: number }[]
+      await db.all(`SELECT date, SUM(end_hour - start_hour) AS hours FROM bookings
+           WHERE date BETWEEN ? AND ? AND status = 'confirmed' AND kind = 'booking' GROUP BY date`, from, today) as { date: string; hours: number }[]
     ).map((r) => [r.date, r.hours])
   );
   const chart = Array.from({ length: 14 }, (_, i) => {
@@ -57,21 +54,13 @@ export default async function AdminOverview() {
     return { key: d, label: f.dayNum(d), longLabel: f.dateShort(d), value: perDay.get(d) ?? 0 };
   });
 
-  const perCourt = db
-    .prepare(
-      `SELECT c.id, c.name, c.close_hour - c.open_hour AS capacity, COALESCE(SUM(b.end_hour - b.start_hour), 0) AS hours FROM courts c
+  const perCourt = await db.all(`SELECT c.id, c.name, c.close_hour - c.open_hour AS capacity, COALESCE(SUM(b.end_hour - b.start_hour), 0) AS hours FROM courts c
        LEFT JOIN bookings b ON b.court_id = c.id AND b.date BETWEEN ? AND ? AND b.status = 'confirmed' AND b.kind = 'booking'
-       WHERE c.active = 1 GROUP BY c.id ORDER BY c.id`
-    )
-    .all(addDays(today, -6), today) as { id: number; name: string; capacity: number; hours: number }[];
+       WHERE c.active = 1 GROUP BY c.id ORDER BY c.id`, addDays(today, -6), today) as { id: number; name: string; capacity: number; hours: number }[];
 
-  const schedule = db
-    .prepare(
-      `SELECT b.id, b.code, b.kind, b.start_hour, b.end_hour, b.note, c.name AS court_name, u.name AS user_name
+  const schedule = await db.all(`SELECT b.id, b.code, b.kind, b.start_hour, b.end_hour, b.note, c.name AS court_name, u.name AS user_name
        FROM bookings b JOIN courts c ON c.id = b.court_id JOIN users u ON u.id = b.user_id
-       WHERE b.date = ? AND b.status = 'confirmed' ORDER BY b.start_hour, c.id`
-    )
-    .all(today) as TodayRow[];
+       WHERE b.date = ? AND b.status = 'confirmed' ORDER BY b.start_hour, c.id`, today) as TodayRow[];
 
   const tiles = [
     { label: o.tileToday, value: String(todayAgg.n), sub: o.tileTodaySub(todayAgg.hours) },

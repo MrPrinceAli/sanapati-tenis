@@ -4,7 +4,8 @@ export function Avatar({ name, hue, size = 40, avatar }: { name: string; hue: nu
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={`/media/${avatar}`}
+        // Data lama menyimpan nama file saja; data baru menyimpan src lengkap (/media/… atau URL Vercel Blob).
+        src={avatar.startsWith("/") || avatar.startsWith("http") ? avatar : `/media/${avatar}`}
         alt=""
         width={size}
         height={size}

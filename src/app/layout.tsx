@@ -18,7 +18,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { locale, rules } = await getI18n();
   return (
-    <html lang={locale} className={`${bricolage.variable} ${instrument.variable}`}>
+    // suppressHydrationWarning: browser HP (terjemahan otomatis, mode gelap paksa, ekstensi) sering mengubah atribut <html>
+    // sebelum React aktif. Hanya berlaku untuk atribut tag ini saja, bukan untuk isi halaman.
+    <html lang={locale} className={`${bricolage.variable} ${instrument.variable}`} suppressHydrationWarning>
       <body className="flex min-h-dvh flex-col">
         <I18nProvider locale={locale} rules={rules}>
           {children}

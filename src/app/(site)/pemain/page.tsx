@@ -29,16 +29,12 @@ export default async function PlayersPage({ searchParams }: { searchParams: Prom
   const { t } = await getI18n();
   const activeLevel = LEVELS.includes(level ?? "") ? level! : "";
 
-  const players = db
-    .prepare(
-      `SELECT u.id, u.name, u.level, u.city, u.hand, u.avatar_hue, u.avatar,
+  const players = await db.all(`SELECT u.id, u.name, u.level, u.city, u.hand, u.avatar_hue, u.avatar,
               COALESCE(SUM(CASE WHEN b.status = 'confirmed' AND b.kind = 'booking' AND b.date < @today
                                 THEN b.end_hour - b.start_hour END), 0) AS hours
        FROM users u LEFT JOIN bookings b ON b.user_id = u.id
        WHERE u.is_public = 1 AND u.role = 'user' AND (@level = '' OR u.level = @level)
-       GROUP BY u.id ORDER BY hours DESC, u.name`
-    )
-    .all({ today: todayWIB(), level: activeLevel }) as PlayerRow[];
+       GROUP BY u.id ORDER BY hours DESC, u.name`, { today: todayWIB(), level: activeLevel }) as PlayerRow[];
 
   return (
     <div className="container-page pt-10">

@@ -19,14 +19,14 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const today = todayWIB();
   const maxDate = addDays(today, rules.maxDaysAhead);
   // Tanpa pilihan eksplisit, lompat ke besok kalau slot terakhir hari ini sudah lewat.
-  const courts = getCourts();
+  const courts = await getCourts();
   const lastSlot = Math.max(...courts.map((c) => c.close_hour)) - 1;
   const fallback = slotMs(today, lastSlot) <= Date.now() ? addDays(today, 1) : today;
   const date = isValidDate(tanggal) && tanggal >= today && tanggal <= maxDate ? tanggal : fallback;
 
   const user = await getCurrentUser();
   const busy: Record<number, Record<number, SlotState>> = {};
-  for (const b of getDayBookings(date)) {
+  for (const b of await getDayBookings(date)) {
     const state: SlotState = b.kind === "block" ? "block" : b.user_id === user?.id ? "mine" : "booked";
     for (let h = b.start_hour; h < b.end_hour; h++) (busy[b.court_id] ??= {})[h] = state;
   }

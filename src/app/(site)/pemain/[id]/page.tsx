@@ -11,33 +11,29 @@ import { todayWIB } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
-function loadPlayer(id: string): User | undefined {
+async function loadPlayer(id: string): Promise<User | undefined> {
   if (!/^[0-9]+$/.test(id)) return undefined;
-  return db.prepare("SELECT * FROM users WHERE id = ?").get(Number(id)) as User | undefined;
+  return db.get<User>("SELECT * FROM users WHERE id = ?", Number(id));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const player = loadPlayer((await params).id);
+  const player = await loadPlayer((await params).id);
   return { title: player?.is_public ? player.name : (await getI18n()).t.players.profileMeta };
 }
 
 export default async function PlayerPage({ params }: { params: Promise<{ id: string }> }) {
-  const player = loadPlayer((await params).id);
+  const player = await loadPlayer((await params).id);
   const me = await getCurrentUser();
   const isMe = !!player && me?.id === player.id;
   // Profil privat hanya bisa dilihat pemiliknya.
   if (!player || (!player.is_public && !isMe)) notFound();
 
   const { t, f } = await getI18n();
-  const stats = getPlayerStats(player.id);
-  const recent = db
-    .prepare(
-      `SELECT b.date, b.start_hour, b.end_hour, c.name AS court_name FROM bookings b
+  const stats = await getPlayerStats(player.id);
+  const recent = await db.all(`SELECT b.date, b.start_hour, b.end_hour, c.name AS court_name FROM bookings b
        JOIN courts c ON c.id = b.court_id
        WHERE b.user_id = ? AND b.kind = 'booking' AND b.status = 'confirmed' AND b.date < ?
-       ORDER BY b.date DESC, b.start_hour DESC LIMIT 5`
-    )
-    .all(player.id, todayWIB()) as { date: string; start_hour: number; end_hour: number; court_name: string }[];
+       ORDER BY b.date DESC, b.start_hour DESC LIMIT 5`, player.id, todayWIB()) as { date: string; start_hour: number; end_hour: number; court_name: string }[];
 
   return (
     <div className="container-page max-w-4xl pt-10">

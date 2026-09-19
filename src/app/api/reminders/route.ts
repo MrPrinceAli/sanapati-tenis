@@ -8,7 +8,7 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return Response.json({ reminders: [] }, { status: 401 });
 
-  const reminders = getUpcomingForUser(user.id, 48).map((b) => ({
+  const reminders = (await getUpcomingForUser(user.id, 48)).map((b) => ({
     code: b.code,
     court: b.court_name,
     date: b.date,

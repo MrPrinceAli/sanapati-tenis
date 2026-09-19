@@ -17,40 +17,32 @@ async function baseUrl(): Promise<string> {
   return `${proto}://${host}`;
 }
 
-export function recentRequestCount(userId: number): number {
-  const row = db
-    .prepare("SELECT COUNT(*) AS n FROM password_resets WHERE user_id = ? AND created_at > ?")
-    .get(userId, Date.now() - TTL_MS) as { n: number };
-  return row.n;
+export async function recentRequestCount(userId: number): Promise<number> {
+  const row = await db.get<{ n: number }>("SELECT COUNT(*) AS n FROM password_resets WHERE user_id = ? AND created_at > ?", userId, Date.now() - TTL_MS);
+  return row?.n ?? 0;
 }
 
 /** Membuat token sekali-pakai dan mengembalikan link reset lengkap. */
 export async function createResetToken(userId: number): Promise<string> {
   const token = randomBytes(32).toString("hex");
   const now = Date.now();
-  db.prepare("INSERT INTO password_resets (user_id, token_hash, expires_at, created_at) VALUES (?,?,?,?)").run(
-    userId,
-    hash(token),
-    now + TTL_MS,
-    now
-  );
+  await db.run("INSERT INTO password_resets (user_id, token_hash, expires_at, created_at) VALUES (?,?,?,?)", userId, hash(token), now + TTL_MS, now);
   return `${await baseUrl()}/reset-password/${token}`;
 }
 
-export function findUserByResetToken(token: string): User | undefined {
+export async function findUserByResetToken(token: string): Promise<User | undefined> {
   if (!/^[a-f0-9]{64}$/.test(token)) return undefined;
-  return db
-    .prepare(
-      `SELECT u.* FROM password_resets r JOIN users u ON u.id = r.user_id
-       WHERE r.token_hash = ? AND r.used_at IS NULL AND r.expires_at > ?`
-    )
-    .get(hash(token), Date.now()) as User | undefined;
+  return db.get<User>(
+    `SELECT u.* FROM password_resets r JOIN users u ON u.id = r.user_id
+     WHERE r.token_hash = ? AND r.used_at IS NULL AND r.expires_at > ?`,
+    hash(token),
+    Date.now()
+  );
 }
 
 /** Setelah password diganti, semua link reset milik user itu hangus. */
-export function burnResetTokens(userId: number) {
-  db.prepare("UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL").run(Date.now(), userId);
-}
+export const burnResetTokens = (userId: number) =>
+  db.run("UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL", Date.now(), userId);
 
 /**
  * Kirim email lewat Resend bila RESEND_API_KEY + MAIL_FROM diisi.

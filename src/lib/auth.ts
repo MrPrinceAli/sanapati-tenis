@@ -43,7 +43,7 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
-    const user = db.prepare("SELECT * FROM users WHERE id = ?").get(payload.uid as number) as User | undefined;
+    const user = await db.get<User>("SELECT * FROM users WHERE id = ?", payload.uid as number);
     if (!user || user.suspended) return null;
     // Sesi yang dibuat sebelum password diganti dianggap hangus (toleransi 1 detik karena `iat` berbasis detik).
     const changedAt = user.password_changed_at ? Date.parse(user.password_changed_at) : 0;

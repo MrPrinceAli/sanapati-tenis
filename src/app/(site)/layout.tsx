@@ -8,9 +8,9 @@ import { getSettings } from "@/lib/settings";
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   const { t, f, locale } = await getI18n();
-  const settings = getSettings();
+  const settings = await getSettings();
   const announcement = (locale === "en" && settings.announcementEn) || settings.announcementId;
-  const courts = getCourts();
+  const courts = await getCourts();
   const OPEN_HOUR = Math.min(...courts.map((c) => c.open_hour));
   const CLOSE_HOUR = Math.max(...courts.map((c) => c.close_hour));
   return (
@@ -47,8 +47,14 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
             </ul>
           </div>
         </div>
-        <div className="border-t border-cream/10 py-5 text-center text-xs text-cream/40">
-          © {new Date().getFullYear()} Sanapati Tenis
+        {/* Hak cipta milik klub pemakai; kredit pembuat ditulis terpisah supaya jelas siapa yang mengelola dan siapa yang membuat. */}
+        <div className="border-t border-cream/10">
+          <div className="container-page flex flex-col items-center justify-between gap-1.5 py-5 text-xs text-cream/40 sm:flex-row">
+            <p>© {new Date().getFullYear()} Sanapati Tenis Club</p>
+            <p>
+              {t.footer.madeBy} <span className="font-semibold text-cream/70">Ali</span>
+            </p>
+          </div>
         </div>
       </footer>
     </>

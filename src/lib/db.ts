@@ -1,6 +1,7 @@
 import "server-only";
-import Database from "better-sqlite3";
+import type { Client, InArgs, InStatement, ResultSet, Transaction } from "@libsql/client";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { addDays, todayWIB } from "./time";
@@ -69,8 +70,16 @@ export type GalleryItem = {
 export const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
 
-function migrate(db: Database.Database) {
-  db.exec(`
+/**
+ * Database: Turso (SQLite di cloud) bila TURSO_DATABASE_URL diisi — wajib di hosting serverless seperti Vercel yang
+ * sistem file-nya read-only — atau file SQLite lokal di DATA_DIR untuk development / server dengan disk sendiri.
+ */
+const REMOTE_URL = process.env.TURSO_DATABASE_URL;
+
+// Naikkan angka ini setiap kali SCHEMA atau daftar kolom di bawah berubah.
+const SCHEMA_VERSION = "5";
+
+const SCHEMA = `
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -172,21 +181,20 @@ function migrate(db: Database.Database) {
       is_bye INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_mm_matches_session ON mm_matches(session_id, round, slot);
-  `);
 
-  // Migrasi aditif: database yang sudah berisi data tidak perlu di-reset saat ada kolom baru.
-  const addColumn = (table: string, column: string, ddl: string) => {
-    const cols = db.prepare(`SELECT name FROM pragma_table_info('${table}')`).all() as { name: string }[];
-    if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
-  };
-  addColumn("users", "avatar", "TEXT NOT NULL DEFAULT ''");
-  addColumn("users", "password_changed_at", "TEXT");
-  addColumn("courts", "open_hour", "INTEGER NOT NULL DEFAULT 6");
-  addColumn("courts", "close_hour", "INTEGER NOT NULL DEFAULT 23");
-  addColumn("mm_sessions", "open_edit", "INTEGER NOT NULL DEFAULT 1");
-  addColumn("users", "suspended", "INTEGER NOT NULL DEFAULT 0");
-  db.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
-}
+    CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+`;
+
+// Kolom yang ditambahkan setelah rilis pertama. Migrasi selalu aditif: data yang sudah ada tidak pernah di-reset.
+const ADDED_COLUMNS: [table: string, column: string, ddl: string][] = [
+  ["users", "avatar", "TEXT NOT NULL DEFAULT ''"],
+  ["users", "password_changed_at", "TEXT"],
+  ["users", "suspended", "INTEGER NOT NULL DEFAULT 0"],
+  ["courts", "open_hour", "INTEGER NOT NULL DEFAULT 6"],
+  ["courts", "close_hour", "INTEGER NOT NULL DEFAULT 23"],
+  ["mm_sessions", "open_edit", "INTEGER NOT NULL DEFAULT 1"],
+];
 
 export function newBookingCode(): string {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -195,23 +203,75 @@ export function newBookingCode(): string {
   return `SNP-${s}`;
 }
 
-// Data awal supaya aplikasi langsung bisa dicoba. Hanya jalan saat database masih kosong.
-function seed(db: Database.Database) {
-  const run = db.transaction(() => {
-    const { n } = db.prepare("SELECT COUNT(*) AS n FROM courts").get() as { n: number };
-    if (n > 0) return;
+async function migrate(client: Client) {
+  // Jalur cepat: satu query saja saat skema sudah terbaru (penting untuk cold start di serverless).
+  try {
+    const v = await client.execute("SELECT value FROM meta WHERE key = 'schema_version'");
+    if (v.rows[0]?.[0] === SCHEMA_VERSION) return;
+  } catch {
+    /* tabel meta belum ada: database baru */
+  }
+  // Satu batch atomik. Skema tidak punya trigger, jadi aman dipecah per titik koma.
+  await client.batch(
+    SCHEMA.split(";")
+      .map((q) => q.trim())
+      .filter(Boolean),
+    "write"
+  );
+  // "Tambah kolom, abaikan kalau sudah ada" — sengaja tidak memakai pragma_table_info(),
+  // karena fungsi PRAGMA bernilai-tabel tidak selalu diizinkan di server database terkelola.
+  for (const [table, column, ddl] of ADDED_COLUMNS) {
+    try {
+      await client.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+    } catch (e) {
+      if (!/duplicate column/i.test(String((e as Error)?.message ?? e))) throw e;
+    }
+  }
+  await client.execute({
+    sql: "INSERT INTO meta (key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    args: [SCHEMA_VERSION],
+  });
+}
 
-    const insertCourt = db.prepare("INSERT INTO courts (name, surface, indoor, description) VALUES (?,?,?,?)");
-    insertCourt.run("Sawangan", "Hard court", 0, "Lapangan tenis di Sawangan, Depok.");
-    insertCourt.run("Ragunan", "Hard court", 0, "Lapangan tenis di Ragunan, Jakarta Selatan.");
+// Data awal, hanya saat database masih kosong. Akun & booking contoh TIDAK dibuat di produksi.
+async function seed(client: Client) {
+  const count = await client.execute("SELECT COUNT(*) FROM courts");
+  if (Number(count.rows[0][0]) > 0) return;
 
-    const insertUser = db.prepare(
-      `INSERT INTO users (name, email, phone, password_hash, role, level, hand, backhand, city, bio, avatar_hue)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`
-    );
-    const adminHash = bcrypt.hashSync("admin123", 10);
+  const production = process.env.NODE_ENV === "production";
+  const withDemo = !production || process.env.SEED_DEMO === "1";
+  // Di produksi password admin tidak boleh yang tertulis di kode (repo ini publik).
+  let adminPassword = process.env.ADMIN_PASSWORD || (production ? "" : "admin123");
+  if (!adminPassword) {
+    adminPassword = randomBytes(9).toString("base64url");
+    console.warn(`[seed] ADMIN_PASSWORD tidak diatur. Password admin sementara: ${adminPassword} — segera ganti dari halaman admin.`);
+  }
+
+  const stmts: InStatement[] = [
+    { sql: "INSERT INTO courts (name, surface, indoor, description) VALUES (?,?,?,?)", args: ["Sawangan", "Hard court", 0, "Lapangan tenis di Sawangan, Depok."] },
+    { sql: "INSERT INTO courts (name, surface, indoor, description) VALUES (?,?,?,?)", args: ["Ragunan", "Hard court", 0, "Lapangan tenis di Ragunan, Jakarta Selatan."] },
+  ];
+  const insertUser = `INSERT INTO users (name, email, phone, password_hash, role, level, hand, backhand, city, bio, avatar_hue)
+                      VALUES (?,?,?,?,?,?,?,?,?,?,?)`;
+  stmts.push({
+    sql: insertUser,
+    args: ["Admin Sanapati", process.env.ADMIN_EMAIL || "admin@sanapati.id", "081200000001", bcrypt.hashSync(adminPassword, 10), "admin", "Menengah", "Kanan", "Dua tangan", "Jakarta", "Pengelola Sanapati Tenis.", 150],
+  });
+  for (const [title, category, src] of [
+    ["Lapangan dari atas", "Lapangan", "/gallery/court-top.svg"],
+    ["Garis baseline", "Lapangan", "/gallery/clay-lines.svg"],
+    ["Sesi malam di bawah lampu", "Suasana", "/gallery/night-lights.svg"],
+    ["Di balik net", "Suasana", "/gallery/net.svg"],
+    ["Turnamen internal 2026", "Turnamen", "/gallery/tournament.svg"],
+    ["Bola baru, semangat baru", "Komunitas", "/gallery/balls.svg"],
+    ["Pagi di lapangan", "Lapangan", "/gallery/garden.svg"],
+    ["Klinik akhir pekan", "Komunitas", "/gallery/clinic.svg"],
+  ]) {
+    stmts.push({ sql: "INSERT INTO gallery (title, category, src) VALUES (?,?,?)", args: [title, category, src] });
+  }
+
+  if (withDemo) {
     const userHash = bcrypt.hashSync("tenis123", 10);
-    insertUser.run("Admin Sanapati", "admin@sanapati.id", "081200000001", adminHash, "admin", "Menengah", "Kanan", "Dua tangan", "Jakarta", "Pengelola Sanapati Tenis.", 150);
     const players: [string, string, string, string, string, string, string, number][] = [
       ["Raka Pratama", "raka@contoh.id", "Menengah", "Kanan", "Dua tangan", "Jakarta Selatan", "Main tiap Sabtu pagi. Suka reli panjang dari baseline, lagi belajar serve kick.", 18],
       ["Dinda Maharani", "dinda@contoh.id", "Mahir", "Kanan", "Satu tangan", "Depok", "Eks atlet junior. Main single maupun double.", 330],
@@ -220,73 +280,151 @@ function seed(db: Database.Database) {
       ["Yoga Santoso", "yoga@contoh.id", "Mahir", "Kiri", "Satu tangan", "Bekasi", "Serve and volley. Main malam sepulang kerja.", 45],
     ];
     players.forEach(([name, email, level, hand, backhand, city, bio, hue], i) =>
-      insertUser.run(name, email, `08130000000${i + 1}`, userHash, "user", level, hand, backhand, city, bio, hue)
+      stmts.push({ sql: insertUser, args: [name, email, `08130000000${i + 1}`, userHash, "user", level, hand, backhand, city, bio, hue] })
     );
 
-    const insertGallery = db.prepare("INSERT INTO gallery (title, category, src) VALUES (?,?,?)");
-    [
-      ["Lapangan dari atas", "Lapangan", "/gallery/court-top.svg"],
-      ["Garis baseline", "Lapangan", "/gallery/clay-lines.svg"],
-      ["Sesi malam di bawah lampu", "Suasana", "/gallery/night-lights.svg"],
-      ["Di balik net", "Suasana", "/gallery/net.svg"],
-      ["Turnamen internal 2026", "Turnamen", "/gallery/tournament.svg"],
-      ["Bola baru, semangat baru", "Komunitas", "/gallery/balls.svg"],
-      ["Pagi di lapangan", "Lapangan", "/gallery/garden.svg"],
-      ["Klinik akhir pekan", "Komunitas", "/gallery/clinic.svg"],
-    ].forEach(([title, category, src]) => insertGallery.run(title, category, src));
-
-    // Booking contoh: 3 minggu ke belakang + seminggu ke depan, deterministik.
-    const insertBooking = db.prepare(
-      "INSERT INTO bookings (code, user_id, court_id, date, start_hour, end_hour) VALUES (?,?,?,?,?,?)"
-    );
-    const overlap = db.prepare(
-      "SELECT 1 FROM bookings WHERE court_id=? AND date=? AND start_hour < ? AND end_hour > ?"
-    );
-    const courts = db.prepare("SELECT * FROM courts").all() as Court[];
+    // Booking contoh: 3 minggu ke belakang + seminggu ke depan, deterministik. Database masih kosong, jadi id berurutan:
+    // lapangan 1-2, admin 1, pemain 2-6. Bentrok dicek di memori supaya semuanya bisa dikirim dalam satu batch.
     let s = 20260918;
     const rand = () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
     const today = todayWIB();
-    // Sisakan ruang di bawah MAX_ACTIVE_BOOKINGS supaya akun demo tetap bisa mencoba booking.
+    const taken = new Set<string>();
     const upcomingPerUser = new Map<number, number>();
     for (let offset = -21; offset <= 6; offset++) {
       const date = addDays(today, offset);
-      const count = 3 + Math.floor(rand() * 5);
-      for (let k = 0; k < count; k++) {
-        const court = courts[Math.floor(rand() * courts.length)];
+      const n = 3 + Math.floor(rand() * 5);
+      for (let k = 0; k < n; k++) {
+        const courtId = 1 + Math.floor(rand() * 2);
         const start = [6, 7, 8, 9, 15, 16, 17, 18, 19, 20][Math.floor(rand() * 10)];
         const end = Math.min(22, start + 1 + Math.floor(rand() * 2));
-        if (overlap.get(court.id, date, end, start)) continue;
+        const hours = Array.from({ length: end - start }, (_, i) => `${courtId}:${date}:${start + i}`);
+        if (hours.some((h) => taken.has(h))) continue;
         const userId = 2 + Math.floor(rand() * players.length);
         if (offset >= 0) {
-          const n = upcomingPerUser.get(userId) ?? 0;
-          if (n >= 2) continue;
-          upcomingPerUser.set(userId, n + 1);
+          // Sisakan ruang di bawah batas booking aktif supaya akun demo tetap bisa mencoba booking.
+          const upcoming = upcomingPerUser.get(userId) ?? 0;
+          if (upcoming >= 2) continue;
+          upcomingPerUser.set(userId, upcoming + 1);
         }
-        insertBooking.run(newBookingCode(), userId, court.id, date, start, end);
+        hours.forEach((h) => taken.add(h));
+        stmts.push({
+          sql: "INSERT INTO bookings (code, user_id, court_id, date, start_hour, end_hour) VALUES (?,?,?,?,?,?)",
+          args: [newBookingCode(), userId, courtId, date, start, end],
+        });
       }
     }
-  });
-  run.immediate();
+  }
+  await client.batch(stmts, "write");
 }
 
-const g = globalThis as unknown as { __sanapatiDb?: Database.Database };
+const g = globalThis as unknown as { __sanapatiClient?: Promise<Client> };
 
-function open(): Database.Database {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-  const db = new Database(path.join(DATA_DIR, "sanapati.db"), { timeout: 10000 });
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  migrate(db);
-  seed(db);
-  return db;
+async function open(): Promise<Client> {
+  if (!REMOTE_URL && process.env.VERCEL) {
+    throw new Error(
+      "TURSO_DATABASE_URL belum diatur. Di Vercel sistem file read-only, jadi SQLite berbasis file tidak bisa dipakai. Lihat README bagian Deploy."
+    );
+  }
+  let client: Client;
+  if (REMOTE_URL) {
+    // Klien "web" murni HTTP: tidak butuh binary native, cocok untuk serverless.
+    const { createClient } = await import("@libsql/client/web");
+    client = createClient({ url: REMOTE_URL, authToken: process.env.TURSO_AUTH_TOKEN });
+  } else {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    const { createClient } = await import("@libsql/client");
+    client = createClient({ url: `file:${path.join(DATA_DIR, "sanapati.db")}` });
+    await client.execute("PRAGMA journal_mode = WAL");
+    await client.execute("PRAGMA busy_timeout = 10000");
+  }
+  await client.execute("PRAGMA foreign_keys = ON").catch(() => {});
+  await migrate(client);
+  await seed(client);
+  return client;
 }
 
-// Lazy: koneksi baru dibuka saat query pertama, bukan saat modul di-import.
-// `next build` meng-import semua route di banyak worker sekaligus dan akan berebut lock file.
-export const db = new Proxy({} as Database.Database, {
-  get(_, prop) {
-    const real = (g.__sanapatiDb ??= open());
-    const value = real[prop as keyof Database.Database];
-    return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(real) : value;
+// Lazy + dibagi bersama: koneksi dibuka saat query pertama, bukan saat modul di-import
+// (`next build` meng-import semua route di banyak worker sekaligus).
+function ready(): Promise<Client> {
+  if (!g.__sanapatiClient) {
+    g.__sanapatiClient = open().catch((e) => {
+      g.__sanapatiClient = undefined; // jangan menyimpan kegagalan: permintaan berikutnya boleh mencoba lagi
+      throw e;
+    });
+  }
+  return g.__sanapatiClient;
+}
+
+type Args = unknown[];
+// Satu argumen berupa objek polos = parameter bernama (@nama); selain itu parameter posisi (?).
+const toArgs = (args: Args): InArgs =>
+  (args.length === 1 && args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0]) && !(args[0] instanceof Uint8Array)
+    ? args[0]
+    : args.map((a) => (a === undefined ? null : a))) as InArgs;
+
+// Baris dijadikan objek polos: hasil query sering diteruskan ke client component, yang hanya menerima data serializable.
+const plain = <T>(rs: ResultSet): T[] => rs.rows.map((row) => Object.fromEntries(rs.columns.map((c, i) => [c, row[i]])) as T);
+
+type Executor = Pick<Client | Transaction, "execute">;
+
+// Gangguan jaringan sesaat ke database cloud (timeout koneksi, socket putus) tidak boleh langsung jadi halaman error.
+// Hanya query BACA yang diulang: mengulang query tulis berisiko dijalankan dua kali.
+const isTransient = (e: unknown) => /fetch failed|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|Connect Timeout|network/i.test(
+  `${(e as Error)?.message ?? e} ${((e as { cause?: Error })?.cause?.message ?? "")}`
+);
+// Gagal SAAT MENYAMBUNG = perintah belum pernah sampai ke server, jadi query tulis pun aman diulang.
+// (Putus di tengah jalan — ECONNRESET dkk. — tidak termasuk: perintahnya mungkin sudah dijalankan.)
+const neverConnected = (e: unknown) =>
+  ["UND_ERR_CONNECT_TIMEOUT", "ECONNREFUSED", "EAI_AGAIN", "ENOTFOUND"].includes(String((e as { cause?: { code?: string } })?.cause?.code));
+
+async function withRetry<T>(run: () => Promise<T>, shouldRetry: (e: unknown) => boolean): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await run();
+    } catch (e) {
+      if (attempt >= 2 || !shouldRetry(e)) throw e;
+      await new Promise((r) => setTimeout(r, 150 * (attempt + 1)));
+    }
+  }
+}
+const readWithRetry = <T>(run: () => Promise<T>, retry: boolean) => withRetry(run, (e) => retry && (isTransient(e) || neverConnected(e)));
+const writeWithRetry = <T>(run: () => Promise<T>, retry: boolean) => withRetry(run, (e) => retry && neverConnected(e));
+
+// `retry` dimatikan di dalam transaksi: koneksi transaksi yang putus tidak bisa dilanjutkan, harus gagal seluruhnya.
+const api = (exec: () => Promise<Executor>, retry = true) => ({
+  async all<T>(sql: string, ...args: Args): Promise<T[]> {
+    return plain<T>(await readWithRetry(async () => (await exec()).execute({ sql, args: toArgs(args) }), retry));
+  },
+  async get<T>(sql: string, ...args: Args): Promise<T | undefined> {
+    return plain<T>(await readWithRetry(async () => (await exec()).execute({ sql, args: toArgs(args) }), retry))[0];
+  },
+  async run(sql: string, ...args: Args): Promise<{ lastInsertRowid: number; changes: number }> {
+    const rs = await writeWithRetry(async () => (await exec()).execute({ sql, args: toArgs(args) }), retry);
+    return { lastInsertRowid: Number(rs.lastInsertRowid ?? 0), changes: rs.rowsAffected };
   },
 });
+export type Tx = ReturnType<typeof api>;
+
+export const db = {
+  ...api(ready),
+  /** Beberapa perintah tulis sekaligus, atomik (semua berhasil atau semua batal), dalam satu round-trip. */
+  async batch(stmts: { sql: string; args?: Args }[]): Promise<void> {
+    if (stmts.length === 0) return;
+    const batch = stmts.map((s) => ({ sql: s.sql, args: toArgs(s.args ?? []) }));
+    await writeWithRetry(async () => (await ready()).batch(batch, "write"), true);
+  },
+  /** Transaksi tulis interaktif: dipakai saat keputusan bergantung pada hasil baca di dalamnya (mis. cek bentrok lalu insert). */
+  async tx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+    const t = await (await ready()).transaction("write");
+    try {
+      const result = await fn(api(async () => t, false));
+      await t.commit();
+      return result;
+    } catch (e) {
+      await t.rollback().catch(() => {});
+      throw e;
+    } finally {
+      t.close();
+    }
+  },
+};

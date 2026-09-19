@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const session = getSession(Number((await params).id));
+  const session = await getSession(Number((await params).id));
   return { title: session?.title ?? (await getI18n()).t.mabar.metaTitle };
 }
 
@@ -42,7 +42,7 @@ function bracketRoundName(m: Dict["mabar"], matchesInRound: number) {
 }
 
 export default async function SessionPage({ params }: Params) {
-  const session = getSession(Number((await params).id));
+  const session = await getSession(Number((await params).id));
   if (!session) notFound();
 
   const { t, f } = await getI18n();
@@ -51,11 +51,11 @@ export default async function SessionPage({ params }: Params) {
   const manager = canManage(session, user);
   // Kontributor = boleh isi skor & nama. Di sesi terbuka itu berarti semua orang, termasuk yang tidak login.
   const contributor = canContribute(session, user);
-  const players = getPlayers(session.id);
+  const players = await getPlayers(session.id);
   const active = players.filter((p) => p.active);
-  const matches = getMatches(session.id);
+  const matches = await getMatches(session.id);
   const status = statusOf(session, matches);
-  const owner = db.prepare("SELECT name FROM users WHERE id = ?").get(session.owner_id) as { name: string } | undefined;
+  const owner = await db.get("SELECT name FROM users WHERE id = ?", session.owner_id) as { name: string } | undefined;
 
   const nameOf = (id: number) => players.find((p) => p.id === id)?.name ?? "?";
   const team = (ids: number[]) => ids.map(nameOf).join(" & ");
@@ -158,7 +158,7 @@ export default async function SessionPage({ params }: Params) {
           <details className="border-t border-line pt-4">
             <summary className="cursor-pointer text-sm font-semibold text-court-700">{m.formEdit}</summary>
             <div className="mt-5">
-              <SessionForm locations={getCourts().map((c) => c.name)} initial={session} />
+              <SessionForm locations={(await getCourts()).map((c) => c.name)} initial={session} />
             </div>
           </details>
         </section>

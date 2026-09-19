@@ -15,7 +15,7 @@ export default async function MabarPage() {
   const { t, f } = await getI18n();
   const m = t.mabar;
   const user = await getCurrentUser();
-  const cards = listSessions();
+  const cards = await listSessions();
   const live = cards.filter((c) => c.status !== "done").reverse();
   const done = cards.filter((c) => c.status === "done");
 

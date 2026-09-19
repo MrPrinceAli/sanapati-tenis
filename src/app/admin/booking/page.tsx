@@ -24,21 +24,17 @@ export default async function AdminBookings({ searchParams }: { searchParams: Pr
   const status = sp.status === "confirmed" || sp.status === "cancelled" ? sp.status : "";
   const q = (sp.q ?? "").trim().slice(0, 60);
 
-  const rows = db
-    .prepare(
-      `SELECT b.*, c.name AS court_name, c.surface, c.indoor, u.name AS user_name, u.email AS user_email, u.phone AS user_phone
+  const rows = await db.all(`SELECT b.*, c.name AS court_name, c.surface, c.indoor, u.name AS user_name, u.email AS user_email, u.phone AS user_phone
        FROM bookings b JOIN courts c ON c.id = b.court_id JOIN users u ON u.id = b.user_id
        WHERE b.kind = 'booking'
          AND (@date = '' OR b.date = @date)
          AND (@status = '' OR b.status = @status)
          AND (@q = '' OR u.name LIKE @like OR b.code LIKE @like OR u.email LIKE @like)
-       ORDER BY b.date DESC, b.start_hour DESC LIMIT 200`
-    )
-    .all({ date, status, q, like: `%${q}%` }) as BookingRow[];
+       ORDER BY b.date DESC, b.start_hour DESC LIMIT 200`, { date, status, q, like: `%${q}%` }) as BookingRow[];
 
   const x = t.adminX;
-  const courts = getCourts(false).map((c) => ({ id: c.id, name: c.name }));
-  const users = db.prepare("SELECT id, name, email FROM users WHERE suspended = 0 ORDER BY name").all() as { id: number; name: string; email: string }[];
+  const courts = (await getCourts(false)).map((c) => ({ id: c.id, name: c.name }));
+  const users = await db.all("SELECT id, name, email FROM users WHERE suspended = 0 ORDER BY name") as { id: number; name: string; email: string }[];
 
   return (
     <>

@@ -6,11 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "lint:promises": "eslint --no-inline-config -c eslint.promises.config.mjs src"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "@vercel/blob": "^2.8.0",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.11.1",
     "jose": "^6.2.12",
     "next": "15.5.25",
     "react": "19.1.0",
@@ -20,7 +22,6 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
-    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -28,6 +29,7 @@
     "eslint-config-next": "15.5.25",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "^8.70.0"
   }
 }

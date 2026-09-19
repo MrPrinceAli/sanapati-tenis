@@ -14,7 +14,7 @@ export default async function AdminMabar() {
   const { t, f } = await getI18n();
   const a = t.adminX;
   const m = t.mabar;
-  const cards = listSessions(200);
+  const cards = await listSessions(200);
 
   return (
     <>

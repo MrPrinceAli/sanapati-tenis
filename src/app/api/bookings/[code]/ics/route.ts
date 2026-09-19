@@ -11,7 +11,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ code: stri
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
   const { code } = await params;
-  const b = getBookingByCode(code);
+  const b = await getBookingByCode(code);
   if (!b || b.user_id !== user.id || b.status !== "confirmed") return new Response("Not found", { status: 404 });
   const { t } = await getI18n();
 

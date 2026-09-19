@@ -71,7 +71,7 @@ export function ReminderBell() {
 
   // Booking baru/batal selalu diikuti pindah halaman — muat ulang supaya lonceng tidak menunggu interval.
   useEffect(() => {
-    load();
+    void load(); // sengaja tidak ditunggu: load() menangani error-nya sendiri
   }, [pathname, load]);
 
   // Kirim pengingat sekali per booking begitu masuk jendela waktu yang dipilih user.

@@ -36,7 +36,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const { t, f, locale, rules } = await getI18n();
   const c = t.calendar;
   const me = await getCurrentUser();
-  const courts = getCourts();
+  const courts = await getCourts();
   const today = todayWIB();
 
   const monthParam = /^\d{4}-(0[1-9]|1[0-2])$/.test(sp.bulan ?? "") ? sp.bulan! : "";
@@ -53,13 +53,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const from = selected < gridStart ? selected : gridStart;
   const lastCell = cells[cells.length - 1];
   const to = selected > lastCell ? selected : lastCell;
-  const rows = db
-    .prepare(
-      `SELECT b.court_id, b.date, b.start_hour, b.end_hour, b.kind, b.note, b.user_id, u.name AS user_name, u.is_public
+  const rows = await db.all(`SELECT b.court_id, b.date, b.start_hour, b.end_hour, b.kind, b.note, b.user_id, u.name AS user_name, u.is_public
        FROM bookings b JOIN users u ON u.id = b.user_id
-       WHERE b.status = 'confirmed' AND b.date BETWEEN ? AND ? ORDER BY b.date, b.start_hour`
-    )
-    .all(from, to) as Row[];
+       WHERE b.status = 'confirmed' AND b.date BETWEEN ? AND ? ORDER BY b.date, b.start_hour`, from, to) as Row[];
 
   const byDay = new Map<string, Row[]>();
   for (const r of rows) byDay.set(r.date, [...(byDay.get(r.date) ?? []), r]);

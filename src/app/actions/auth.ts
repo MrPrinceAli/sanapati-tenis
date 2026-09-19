@@ -41,19 +41,17 @@ export async function register(_: FormState, form: FormData): Promise<FormState>
   const level = String(form.get("level") ?? "Pemula");
 
   const fail = (error: string): FormState => ({ error, values: { name, email, phone, level } });
-  if (!getSettings().registrationOpen) return fail(t.errors.registrationClosed);
+  if (!(await getSettings()).registrationOpen) return fail(t.errors.registrationClosed);
   if (name.length < 2 || name.length > 60) return fail(t.errors.nameMin);
   if (!EMAIL_RE.test(email) || email.length > 120) return fail(t.errors.emailInvalid);
   if (!/^[0-9+\-\s]{8,16}$/.test(phone)) return fail(t.errors.phoneInvalid);
   if (password.length < 8 || password.length > 72) return fail(t.errors.pwMin);
   if (!LEVELS.includes(level)) return fail(t.errors.optionInvalid);
 
-  if (db.prepare("SELECT 1 FROM users WHERE email = ?").get(email)) return fail(t.errors.emailTaken);
+  if (await db.get("SELECT 1 FROM users WHERE email = ?", email)) return fail(t.errors.emailTaken);
   const hash = await bcrypt.hash(password, 10);
   const hue = Math.floor(Math.random() * 360);
-  const info = db
-    .prepare("INSERT INTO users (name, email, phone, password_hash, level, avatar_hue) VALUES (?,?,?,?,?,?)")
-    .run(name, email, phone, hash, level, hue);
+  const info = await db.run("INSERT INTO users (name, email, phone, password_hash, level, avatar_hue) VALUES (?,?,?,?,?,?)", name, email, phone, hash, level, hue);
   await createSession(Number(info.lastInsertRowid));
   redirect(safeNext(form.get("next"), "/booking"));
 }
@@ -65,7 +63,7 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   if (!email || !password) return { error: t.errors.fillLogin };
   if (tooManyAttempts(email)) return { error: t.errors.tooMany, values: { email } };
 
-  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as User | undefined;
+  const user = await db.get("SELECT * FROM users WHERE email = ?", email) as User | undefined;
   const ok = user ? await bcrypt.compare(password, user.password_hash) : false;
   if (!user || !ok) return { error: t.errors.wrongLogin, values: { email } };
   // Dicek setelah password benar, supaya status akun tidak bocor ke orang yang hanya menebak email.
@@ -87,8 +85,8 @@ export async function requestPasswordReset(_: FormState, form: FormData): Promis
   if (!EMAIL_RE.test(email)) return { error: t.errors.emailInvalid, values: { email } };
 
   // Jawaban selalu sama, terdaftar atau tidak, supaya form ini tidak bisa dipakai mengecek email siapa yang punya akun.
-  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as User | undefined;
-  if (user && recentRequestCount(user.id) < MAX_REQUESTS_PER_HOUR) {
+  const user = await db.get("SELECT * FROM users WHERE email = ?", email) as User | undefined;
+  if (user && (await recentRequestCount(user.id)) < MAX_REQUESTS_PER_HOUR) {
     const link = await createResetToken(user.id);
     await sendResetEmail(user.email, t.reset.mailSubject, t.reset.mailBody(user.name, link), link);
   }
@@ -97,17 +95,15 @@ export async function requestPasswordReset(_: FormState, form: FormData): Promis
 
 export async function resetPassword(_: FormState, form: FormData): Promise<FormState> {
   const { t } = await getI18n();
-  const user = findUserByResetToken(String(form.get("token") ?? ""));
+  const user = await findUserByResetToken(String(form.get("token") ?? ""));
   if (!user) return { error: t.errors.resetInvalid };
   const password = String(form.get("password") ?? "");
   if (password.length < 8 || password.length > 72) return { error: t.errors.pwMin };
 
-  db.prepare("UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?").run(
-    await bcrypt.hash(password, 10),
+  await db.run("UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?", await bcrypt.hash(password, 10),
     new Date().toISOString(),
-    user.id
-  );
-  burnResetTokens(user.id);
+    user.id);
+  await burnResetTokens(user.id);
   attempts.delete(user.email);
   redirect("/masuk?reset=1");
 }

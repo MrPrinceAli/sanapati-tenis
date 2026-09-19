@@ -12,20 +12,19 @@ import { getI18n } from "@/lib/i18n-server";
 
 type Params = { params: Promise<{ id: string }> };
 
-const load = (id: string) =>
-  /^[0-9]+$/.test(id) ? (db.prepare("SELECT * FROM users WHERE id = ?").get(Number(id)) as User | undefined) : undefined;
+const load = async (id: string) => (/^[0-9]+$/.test(id) ? db.get<User>("SELECT * FROM users WHERE id = ?", Number(id)) : undefined);
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  return { title: load((await params).id)?.name ?? "—" };
+  return { title: (await load((await params).id))?.name ?? "—" };
 }
 
 export default async function AdminUserPage({ params }: Params) {
-  const user = load((await params).id);
+  const user = await load((await params).id);
   if (!user) notFound();
   const me = await getCurrentUser();
   const { t, f } = await getI18n();
   const a = t.adminX;
-  const bookings = getUserBookings(user.id);
+  const bookings = await getUserBookings(user.id);
 
   return (
     <>

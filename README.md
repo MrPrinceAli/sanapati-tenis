@@ -1,6 +1,6 @@
 # Sanapati Tenis
 
-Website komunitas tenis dengan booking lapangan online — **gratis** (tanpa harga/pembayaran), dua lapangan: **Sawangan** dan **Ragunan**, dua bahasa (Indonesia/Inggris). Next.js 15 (App Router) + TypeScript + Tailwind CSS v4 + SQLite.
+Website komunitas tenis dengan booking lapangan online — **gratis** (tanpa harga/pembayaran), dua lapangan: **Sawangan** dan **Ragunan**, dua bahasa (Indonesia/Inggris). Next.js 15 (App Router) + TypeScript + Tailwind CSS v4 + SQLite (file lokal, atau Turso di produksi).
 
 ## Menjalankan
 
@@ -18,14 +18,14 @@ Kolom/tabel baru ditambahkan lewat migrasi aditif di `src/lib/db.ts`, jadi updat
 | Admin | `admin@sanapati.id` | `admin123` |
 | Pemain | `raka@contoh.id` (juga dinda/bima/sekar/yoga) | `tenis123` |
 
-> **Sebelum produksi:** ganti password admin, hapus akun demo, dan isi `SESSION_SECRET` di `.env.local`
-> (lihat `.env.example`; aplikasi menolak jalan di produksi tanpa secret ≥ 32 karakter).
+> Akun demo di atas hanya dibuat di mode development. Di produksi hanya akun admin yang dibuat, dengan password dari `ADMIN_PASSWORD`
+> (lihat `.env.example`); `SESSION_SECRET` wajib diisi, aplikasi menolak jalan di produksi tanpa secret ≥ 32 karakter.
 
 ## Fitur
 
 | Fitur | Halaman | Catatan |
 | --- | --- | --- |
-| Landing page | `/` | Jumlah slot kosong hari ini real-time, daftar lapangan dari database |
+| Landing page | `/` | Scroll-driven: hero 3D yang "diterbangi kamera", langkah booking dengan mockup hidup, panel lapangan bergeser horizontal, galeri parallax. Data slot & lapangan tetap dari database |
 | Booking | `/booking` | Papan lapangan × jam, pilih 1–3 jam berurutan, maksimal 14 hari ke depan |
 | Jadwal (kalender) | `/jadwal` | Kalender bulanan + detail harian per lapangan, publik. Nama hanya tampil untuk pemain berprofil publik |
 | Mabar / matchmaking | `/mabar` | Dashboard publik. Sesi mabar (rotasi adil) atau turnamen (gugur), solo/duo, aturan gender, target skor, rencana durasi, pemerataan jumlah main, input skor, klasemen/bagan otomatis |
@@ -77,6 +77,15 @@ Logika pengacakan ada di [`src/lib/matchmaking.ts`](src/lib/matchmaking.ts) — 
   Pembuat sesi bisa mengunci sesi (centang di "Ubah pengaturan"); sesi yang ditandai selesai otomatis terkunci. Tulisan anonim dibatasi 40/menit per IP.
 - Nama pemain berupa teks bebas (tidak harus punya akun).
 
+## Landing page scroll-driven
+
+Tanpa library animasi. [`ScrollScene`](src/components/landing/ScrollScene.tsx) hanya menulis progres scroll ke CSS (`--p` 0..1 dan `data-step`);
+seluruh gerak ada di `globals.css` dan hanya memakai `transform`/`opacity`, jadi tidak ada re-render React saat scroll.
+
+- `mode="pin"`: isi ditahan di layar selama `screens` layar scroll (hero, cara booking, lapangan). `mode="view"`: progres saat elemen melintasi layar (galeri, CTA).
+- Tanpa JavaScript halaman tetap tampil utuh (kondisi awal); dengan `prefers-reduced-motion` semua pin/geser dimatikan dan konten tersusun seperti halaman biasa.
+- Menambah lapangan aktif otomatis menambah panel di adegan lapangan.
+
 ## Dua bahasa (i18n)
 
 Semua teks ada di kamus [`src/lib/i18n.ts`](src/lib/i18n.ts) + [`src/lib/i18n-extra.ts`](src/lib/i18n-extra.ts) (`id` dan `en`; TypeScript memaksa keduanya punya kunci yang sama).
@@ -102,12 +111,39 @@ src/components/   komponen UI; yang interaktif bertanda "use client"
 
 ## Deploy
 
-Aplikasi menulis ke disk (`data/`, atau folder lain lewat env `DATA_DIR`), jadi butuh hosting dengan penyimpanan persisten — VPS, Railway, Fly.io, atau Docker
-dengan volume. **Tidak cocok** untuk Vercel/serverless tanpa mengganti SQLite ke database terkelola (mis. Postgres/Turso).
+Aplikasi punya dua mode penyimpanan, dipilih otomatis dari environment variable:
+
+| | Database | Foto unggahan | Cocok untuk |
+| --- | --- | --- | --- |
+| **Lokal** (default) | file SQLite di `./data` | `./data/uploads` | development, VPS, Railway/Fly dengan disk persisten |
+| **Cloud** | [Turso](https://turso.tech) (`TURSO_DATABASE_URL`) | Vercel Blob (`BLOB_READ_WRITE_TOKEN`) | **Vercel** / serverless, yang sistem file-nya read-only |
+
+### Vercel + Turso
+
+1. **Turso**: buat akun di turso.tech → *Create Database* → salin **Database URL** (`libsql://…`) dan buat **token**.
+2. **Vercel → Project → Storage**: *Create → Blob* dan hubungkan ke project (mengisi `BLOB_READ_WRITE_TOKEN` otomatis).
+3. **Vercel → Settings → Environment Variables**: isi `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `SESSION_SECRET` (acak ≥ 32 karakter),
+   `ADMIN_PASSWORD` (password admin pertama), dan `APP_URL`. Daftar lengkap ada di [`.env.example`](.env.example).
+   Region fungsi Vercel diatur di [`vercel.json`](vercel.json) (`hnd1` = Tokyo) agar **satu wilayah dengan database Turso**.
+   Satu halaman menjalankan beberapa query; kalau server dan database beda benua, tiap query menambah ±200 ms. Pindah region Turso → ubah juga di sini.
+4. **Redeploy**. Pada request pertama tabel dibuat otomatis dan akun admin dibuat dari `ADMIN_EMAIL`/`ADMIN_PASSWORD`.
+   Akun dan booking contoh **tidak** dibuat di produksi.
+5. Opsional, membawa data lokal: `node scripts/push-to-turso.mjs --yes` (lihat komentar di dalam skripnya).
+
+Tanpa `TURSO_DATABASE_URL` di Vercel, aplikasi berhenti dengan pesan error yang jelas, bukan error 500 yang membingungkan.
+
+### Server dengan disk sendiri
 
 ```bash
-npm run build && npm run start
+npm run build && npm run start     # set DATA_DIR ke volume persisten bila perlu
 ```
+
+### Catatan teknis lapisan data
+
+- Semua akses database lewat helper async di [`src/lib/db.ts`](src/lib/db.ts): `db.get/all/run`, `db.batch` (beberapa tulis, atomik, satu round-trip),
+  `db.tx` (transaksi interaktif — dipakai untuk cek-bentrok-lalu-insert saat booking supaya tidak terjadi double booking).
+- `npm run lint:promises` memeriksa promise yang lupa di-`await`. Jalankan setelah mengubah kode server: di serverless, penulisan yang tidak ditunggu bisa tidak pernah selesai.
+- Pembatas laju (login, isi skor anonim) disimpan di memori proses; di serverless tiap instance menghitung sendiri, jadi sifatnya peredam, bukan pagar mutlak.
 
 ## Belum termasuk
 

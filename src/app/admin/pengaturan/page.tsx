@@ -14,7 +14,7 @@ export default async function AdminSettings() {
       <p className="eyebrow">{t.adminX.tabSettings}</p>
       <h1 className="mt-2 text-3xl font-bold sm:text-4xl">{t.adminX.settingsTitle}</h1>
       <div className="mt-6">
-        <SettingsForm settings={getSettings()} />
+        <SettingsForm settings={await getSettings()} />
       </div>
     </div>
   );

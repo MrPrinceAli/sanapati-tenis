@@ -20,16 +20,12 @@ export default async function AdminCourts() {
   const { t, f } = await getI18n();
   const c = t.admin.courts;
   const today = todayWIB();
-  const courts = getCourts(false);
-  const blocks = db
-    .prepare(
-      `SELECT b.id, b.date, b.start_hour, b.end_hour, b.note, c.name AS court_name FROM bookings b
+  const courts = await getCourts(false);
+  const blocks = await db.all(`SELECT b.id, b.date, b.start_hour, b.end_hour, b.note, c.name AS court_name FROM bookings b
        JOIN courts c ON c.id = b.court_id
-       WHERE b.kind = 'block' AND b.status = 'confirmed' AND b.date >= ? ORDER BY b.date, b.start_hour`
-    )
-    .all(today) as BlockRow[];
+       WHERE b.kind = 'block' AND b.status = 'confirmed' AND b.date >= ? ORDER BY b.date, b.start_hour`, today) as BlockRow[];
   const usage = new Map(
-    (db.prepare("SELECT court_id, COUNT(*) AS n FROM bookings GROUP BY court_id").all() as { court_id: number; n: number }[]).map((r) => [r.court_id, r.n])
+    (await db.all("SELECT court_id, COUNT(*) AS n FROM bookings GROUP BY court_id") as { court_id: number; n: number }[]).map((r) => [r.court_id, r.n])
   );
 
   return (

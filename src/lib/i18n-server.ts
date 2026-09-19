@@ -11,6 +11,6 @@ export const getLocale = cache(async (): Promise<Locale> => {
 
 export async function getI18n() {
   const locale = await getLocale();
-  const rules = getRules();
+  const rules = await getRules();
   return { locale, rules, t: getDict(locale, rules), f: formatters(locale) };
 }

@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function NewSessionPage() {
   await requireUser("/mabar/baru");
   const { t } = await getI18n();
-  const locations = getCourts().map((c) => c.name);
+  const locations = (await getCourts()).map((c) => c.name);
   return (
     <div className="container-page max-w-3xl pt-10">
       <Link href="/mabar" className="text-sm font-medium text-court-700 hover:underline">

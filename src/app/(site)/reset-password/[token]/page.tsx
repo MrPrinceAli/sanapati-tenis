@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ResetPasswordPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const { t } = await getI18n();
-  const user = findUserByResetToken(token);
+  const user = await findUserByResetToken(token);
 
   return (
     <div className="container-page flex justify-center pt-14">
