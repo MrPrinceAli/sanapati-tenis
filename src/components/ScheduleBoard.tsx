@@ -116,7 +116,14 @@ export function ScheduleBoard({ date, courts, busy, clubNote, nowMs, loggedIn }:
                         }`}
                       >
                         {taken === "club" ? (
-                          t.schedule.club
+                          // Tampilkan keterangan yang diatur admin. Di layar sempit dipotong rapi dengan elipsis,
+                          // dan kalau kolomnya benar-benar sempit jatuh ke kata pendek supaya tetap terbaca.
+                          <>
+                            <span className="hidden w-full truncate px-1.5 text-center sm:inline-block">
+                              {clubNote[c.id] || t.schedule.club}
+                            </span>
+                            <span className="sm:hidden">{t.schedule.club}</span>
+                          </>
                         ) : taken === "block" ? (
                           <span className="flex h-full w-full items-center justify-center rounded-lg bg-[repeating-linear-gradient(135deg,transparent_0_4px,rgba(19,33,27,.12)_4px_6px)]">
                             {t.schedule.closed}
