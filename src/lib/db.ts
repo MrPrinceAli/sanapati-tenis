@@ -360,7 +360,16 @@ type Args = unknown[];
 const toArgs = (args: Args): InArgs =>
   (args.length === 1 && args[0] !== null && typeof args[0] === "object" && !Array.isArray(args[0]) && !(args[0] instanceof Uint8Array)
     ? args[0]
-    : args.map((a) => (a === undefined ? null : a))) as InArgs;
+    : args.map(normalize)) as InArgs;
+
+// Driver menolak NaN/Infinity dengan melempar error. Itu bisa terjadi dari `Number(form.get(...))` pada
+// permintaan yang dibuat-buat, dan hasilnya halaman 500. Diubah jadi null supaya query "WHERE id = ?"
+// cukup mengembalikan "tidak ada baris" dan alur error yang rapi tetap berjalan.
+function normalize(a: unknown) {
+  if (a === undefined) return null;
+  if (typeof a === "number" && !Number.isFinite(a)) return null;
+  return a;
+}
 
 // Baris dijadikan objek polos: hasil query sering diteruskan ke client component, yang hanya menerima data serializable.
 const plain = <T>(rs: ResultSet): T[] => rs.rows.map((row) => Object.fromEntries(rs.columns.map((c, i) => [c, row[i]])) as T);

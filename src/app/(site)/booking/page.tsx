@@ -20,7 +20,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const maxDate = addDays(today, rules.maxDaysAhead);
   // Tanpa pilihan eksplisit, lompat ke besok kalau slot terakhir hari ini sudah lewat.
   const courts = await getCourts();
-  const lastSlot = Math.max(...courts.map((c) => c.close_hour)) - 1;
+  const lastSlot = courts.length ? Math.max(...courts.map((c) => c.close_hour)) - 1 : 0;
   const fallback = slotMs(today, lastSlot) <= Date.now() ? addDays(today, 1) : today;
   const date = isValidDate(tanggal) && tanggal >= today && tanggal <= maxDate ? tanggal : fallback;
 

@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n-server";
 import { getCourts } from "@/lib/bookings";
 import { getSettings } from "@/lib/settings";
+import { CLOSE_HOUR as DEFAULT_CLOSE, OPEN_HOUR as DEFAULT_OPEN } from "@/lib/time";
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -11,8 +12,10 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const settings = await getSettings();
   const announcement = (locale === "en" && settings.announcementEn) || settings.announcementId;
   const courts = await getCourts();
-  const OPEN_HOUR = Math.min(...courts.map((c) => c.open_hour));
-  const CLOSE_HOUR = Math.max(...courts.map((c) => c.close_hour));
+  // Jam di footer diringkas dari lapangan yang aktif. Tanpa lapangan aktif, Math.min/max atas array kosong
+  // menghasilkan Infinity — jadi jatuh ke jam default, bukan "Infinity.00".
+  const OPEN_HOUR = courts.length ? Math.min(...courts.map((c) => c.open_hour)) : DEFAULT_OPEN;
+  const CLOSE_HOUR = courts.length ? Math.max(...courts.map((c) => c.close_hour)) : DEFAULT_CLOSE;
   return (
     <>
       <NavBar user={user ? { id: user.id, name: user.name, hue: user.avatar_hue, avatar: user.avatar, isAdmin: user.role === "admin" } : null} />
