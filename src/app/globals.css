@@ -144,6 +144,17 @@ h3 {
   overflow: hidden;
 }
 
+/* Papan booking: kolom jam cukup lebar untuk rentang penuh ("06.00 – 07.00") mulai layar sm;
+   di HP dipersempit dan memakai bentuk ringkas ("06–07"). */
+.slot-grid {
+  grid-template-columns: 3.1rem repeat(var(--courts), minmax(3.5rem, 1fr));
+}
+@media (min-width: 640px) {
+  .slot-grid {
+    grid-template-columns: 6.25rem repeat(var(--courts), minmax(3.5rem, 1fr));
+  }
+}
+
 /* --- Hero: kamera terbang dari sudut miring ke tampak atas --- */
 .hero-court {
   position: absolute;

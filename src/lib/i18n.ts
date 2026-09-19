@@ -972,6 +972,8 @@ export function formatters(locale: Locale) {
   return {
     hour,
     range: (start: number, end: number) => `${hour(start)} – ${hour(end)}`,
+    /** Ringkas untuk kolom sempit: "22–23". */
+    rangeShort: (start: number, end: number) => `${pad(start)}–${pad(end)}`,
     dateLong: (date: string) => day(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
     dateShort: (date: string) => day(date, { weekday: "short", day: "numeric", month: "short" }),
     weekday: (date: string) => day(date, { weekday: "short" }),

@@ -68,8 +68,8 @@ export function ScheduleBoard({ date, courts, busy, clubNote, nowMs, loggedIn }:
 
         <div className="overflow-x-auto">
           <div
-            className="grid gap-1 p-2.5 sm:gap-1.5 sm:p-4"
-            style={{ gridTemplateColumns: `2.6rem repeat(${courts.length}, minmax(3.5rem, 1fr))` }}
+            className="slot-grid grid gap-1 p-2.5 sm:gap-1.5 sm:p-4"
+            style={{ "--courts": courts.length } as React.CSSProperties}
             role="grid"
             aria-label={t.schedule.gridLabel(dateLabel)}
           >
@@ -85,8 +85,10 @@ export function ScheduleBoard({ date, courts, busy, clubNote, nowMs, loggedIn }:
 
             {HOURS.map((h) => (
               <div key={h} className="contents" role="row">
-                <div className="flex items-center justify-end pr-1 text-xs tabular-nums text-muted" role="rowheader">
-                  {f.hour(h)}
+                {/* Rentang penuh, bukan jam mulai saja: baris "22.00" dulu terbaca seolah lapangan tutup jam 22. */}
+                <div className="flex items-center justify-end pr-1 tabular-nums text-muted" role="rowheader">
+                  <span className="hidden text-xs sm:inline">{f.range(h, h + 1)}</span>
+                  <span className="text-[11px] sm:hidden">{f.rangeShort(h, h + 1)}</span>
                 </div>
                 {courts.map((c) => {
                   const outside = h < c.open_hour || h >= c.close_hour;
@@ -109,7 +111,7 @@ export function ScheduleBoard({ date, courts, busy, clubNote, nowMs, loggedIn }:
                       <div
                         key={c.id}
                         role="gridcell"
-                        aria-label={`${c.name} ${f.hour(h)}: ${label}`}
+                        aria-label={`${c.name} ${f.range(h, h + 1)}: ${label}`}
                         title={taken === "club" ? clubNote[c.id] || undefined : undefined}
                         className={`flex h-11 items-center justify-center rounded-lg text-xs font-medium ${
                           taken === "mine" ? "bg-ball text-court-950" : taken === "club" ? "bg-court-200 text-court-800" : taken ? "bg-sand text-muted" : "bg-cream text-muted/50"
