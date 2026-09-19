@@ -58,6 +58,19 @@ export type Booking = {
   created_at: string;
 };
 
+/** Jadwal rutin mingguan: satu baris = satu hari dalam seminggu yang selalu tertutup di lapangan itu. */
+export type RecurringBlock = {
+  id: number;
+  court_id: number;
+  /** ISO: 1 = Senin … 7 = Minggu. */
+  weekday: number;
+  start_hour: number;
+  end_hour: number;
+  note: string;
+  active: number;
+  created_at: string;
+};
+
 export type GalleryItem = {
   id: number;
   title: string;
@@ -77,7 +90,7 @@ export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
 const REMOTE_URL = process.env.TURSO_DATABASE_URL;
 
 // Naikkan angka ini setiap kali SCHEMA atau daftar kolom di bawah berubah.
-const SCHEMA_VERSION = "5";
+const SCHEMA_VERSION = "6";
 
 const SCHEMA = `
     CREATE TABLE IF NOT EXISTS users (
@@ -181,6 +194,17 @@ const SCHEMA = `
       is_bye INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_mm_matches_session ON mm_matches(session_id, round, slot);
+
+    CREATE TABLE IF NOT EXISTS recurring_blocks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      court_id INTEGER NOT NULL REFERENCES courts(id),
+      weekday INTEGER NOT NULL,
+      start_hour INTEGER NOT NULL,
+      end_hour INTEGER NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    );
 
     CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);

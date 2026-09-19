@@ -2,6 +2,7 @@ import "server-only";
 import { db, newBookingCode, type Booking, type Court, type Tx, type User } from "./db";
 import type { ErrorCode } from "./i18n";
 import { ADMIN_MAX_DAYS_AHEAD } from "./rules";
+import { findRecurringClash, getRecurringBlocks } from "./recurring";
 import { getRules } from "./settings";
 import { addDays, isValidDate, slotMs, todayWIB } from "./time";
 
@@ -102,6 +103,11 @@ export async function createBooking({ user, courtId, date, start, end, note = ""
     if (!court) throw new BookingError("courtUnavailable");
     if (start < court.open_hour || end > court.close_hour) throw new BookingError("outsideHours");
     if (await clashes(t, courtId, date, start, end)) throw new BookingError("slotTaken");
+    // Jadwal rutin klub menutup slot untuk pemain. Admin (bypassRules / kind="block") tetap boleh menimpa,
+    // dan booking yang sudah terlanjur ada tidak disentuh — aturan ini hanya menolak booking BARU.
+    if (!free && findRecurringClash(await getRecurringBlocks(), courtId, date, start, end)) {
+      throw new BookingError("clubSession");
+    }
 
     if (!free && user.role !== "admin") {
       const active = await t.get<{ n: number }>(

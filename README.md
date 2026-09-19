@@ -45,7 +45,7 @@ Kolom/tabel baru ditambahkan lewat migrasi aditif di `src/lib/db.ts`, jadi updat
 | --- | --- |
 | Ringkasan | Statistik hari ini/bulan ini, grafik jam terbooking, okupansi per lapangan, jadwal hari ini |
 | Booking | Cari/filter; **buat booking atas nama pemain** (tidak terkena aturan pemain), ubah/pindah jadwal & lapangan, batalkan, pulihkan, hapus permanen |
-| Lapangan & Blokir | Tambah/ubah/nonaktifkan/**hapus** lapangan, jam buka per lapangan, blokir slot |
+| Lapangan & Blokir | Tambah/ubah/nonaktifkan/**hapus** lapangan, jam buka per lapangan, blokir slot sekali jalan, dan **jadwal rutin mingguan** |
 | Galeri | Unggah, ubah judul/kategori, hapus |
 | Pengguna | Tambah pengguna; halaman kelola per user: ubah semua data + email, set password, role, **bekukan akun**, link reset, riwayat booking; hapus akun |
 | Mabar | Semua sesi: kelola, kunci/buka, tandai selesai, hapus |
@@ -63,6 +63,16 @@ Aturan di bawah bisa diubah admin di **/admin/pengaturan** (tersimpan di tabel `
 - Batas pembatalan mandiri: 6 jam sebelum main (admin bisa membatalkan kapan saja)
 
 Cek bentrok + insert berjalan dalam satu transaksi SQLite, jadi dua orang tidak bisa mengambil slot yang sama.
+
+## Jadwal rutin mingguan
+
+Untuk sesi tetap klub (mis. Selasa & Jumat 16.00–22.00 di Sawangan), admin mengaturnya sekali di **Lapangan & Blokir → Jadwal rutin mingguan**.
+
+- Aturan disimpan sebagai pola (`recurring_blocks`: lapangan + hari + jam), lalu dihitung saat halaman dirender — bukan dibuat sebagai ribuan baris booking.
+  Jadi berlaku terus ke depan tanpa cron dan tanpa perlu diisi ulang.
+- Booking **baru** di jam itu ditolak server dengan pesan yang jelas; booking yang **sudah ada tidak dibatalkan** — admin hanya diberi tahu berapa yang bentrok.
+- Admin tetap bisa menimpa (booking atas nama pemain / blokir manual) karena jalur admin melewati aturan pemain.
+- Keterangannya tampil ke pemain: ringkas ("Klub") di papan booking, lengkap di kalender.
 
 ## Mabar / matchmaking
 

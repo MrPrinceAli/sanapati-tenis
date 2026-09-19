@@ -5,6 +5,7 @@ import { getCourts } from "@/lib/bookings";
 import { db } from "@/lib/db";
 import { opt } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
+import { getRecurringBlocks, recurringHours } from "@/lib/recurring";
 import { addDays, isValidDate, todayWIB } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -57,12 +58,20 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
        FROM bookings b JOIN users u ON u.id = b.user_id
        WHERE b.status = 'confirmed' AND b.date BETWEEN ? AND ? ORDER BY b.date, b.start_hour`, from, to) as Row[];
 
+  const weekly = await getRecurringBlocks();
+  const clubHours = (date: string, courtId: number) => recurringHours(weekly, courtId, date);
+  const clubNoteOf = (courtId: number) => weekly.find((r) => r.court_id === courtId && r.note)?.note ?? "";
+
   const byDay = new Map<string, Row[]>();
   for (const r of rows) byDay.set(r.date, [...(byDay.get(r.date) ?? []), r]);
-  const bookedHours = (date: string, courtId: number) =>
-    (byDay.get(date) ?? [])
-      .filter((r) => r.court_id === courtId && r.kind === "booking")
-      .reduce((sum, r) => sum + r.end_hour - r.start_hour, 0);
+  /** Jam terpakai untuk bar kepadatan: booking + jadwal rutin yang belum terisi booking. */
+  const usedHours = (date: string, courtId: number) => {
+    const rows = (byDay.get(date) ?? []).filter((r) => r.court_id === courtId);
+    const taken = new Set<number>();
+    for (const r of rows) for (let h = r.start_hour; h < r.end_hour; h++) taken.add(h);
+    for (const h of clubHours(date, courtId)) taken.add(h);
+    return taken.size;
+  };
 
   const monthLabel = new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "id-ID", { month: "long", year: "numeric", timeZone: "UTC" }).format(
     new Date(`${first}T12:00:00Z`)
@@ -107,7 +116,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             {cells.map((d) => {
               const inMonth = d.startsWith(month);
               const isSelected = d === selected;
-              const total = courts.reduce((sum, court) => sum + bookedHours(d, court.id), 0);
+              const total = courts.reduce((sum, court) => sum + usedHours(d, court.id), 0);
               return (
                 <Link
                   key={d}
@@ -130,7 +139,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                   {/* Satu bar per lapangan: panjang = porsi jam yang terisi hari itu. */}
                   <span className="mt-auto space-y-1" aria-hidden>
                     {courts.map((court) => {
-                      const ratio = bookedHours(d, court.id) / Math.max(1, court.close_hour - court.open_hour);
+                      const ratio = usedHours(d, court.id) / Math.max(1, court.close_hour - court.open_hour);
                       return (
                         <span key={court.id} className={`block h-1.5 overflow-hidden rounded-full ${isSelected ? "bg-cream/20" : "bg-sand"}`}>
                           <span className={`block h-full rounded-full ${isSelected ? "bg-ball" : "bg-court-700"}`} style={{ width: `${Math.min(100, ratio * 100)}%` }} />
@@ -163,26 +172,40 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             {courts.map((court) => {
               const items = (byDay.get(selected) ?? []).filter((r) => r.court_id === court.id);
               // Susun garis waktu: selang kosong di antara booking ditampilkan eksplisit.
-              const timeline: { start: number; end: number; row?: Row }[] = [];
+              const club = clubHours(selected, court.id);
+              const timeline: { start: number; end: number; row?: Row; club?: boolean }[] = [];
+              // Selang kosong dipecah lagi: bagian yang kena jadwal rutin ditandai tersendiri.
+              const addGap = (from: number, to: number) => {
+                let s = from;
+                while (s < to) {
+                  const isClub = club.has(s);
+                  let e = s + 1;
+                  while (e < to && club.has(e) === isClub) e++;
+                  timeline.push({ start: s, end: e, club: isClub });
+                  s = e;
+                }
+              };
               let cursor = court.open_hour;
               for (const r of items) {
-                if (r.start_hour > cursor) timeline.push({ start: cursor, end: r.start_hour });
+                if (r.start_hour > cursor) addGap(cursor, r.start_hour);
                 timeline.push({ start: r.start_hour, end: r.end_hour, row: r });
                 cursor = Math.max(cursor, r.end_hour);
               }
-              if (cursor < court.close_hour) timeline.push({ start: cursor, end: court.close_hour });
+              if (cursor < court.close_hour) addGap(cursor, court.close_hour);
               return (
                 <div key={court.id}>
                   <h3 className="font-display text-lg font-semibold">{court.name}</h3>
                   <p className="text-xs text-muted">
-                    {c.openHours(f.hour(court.open_hour), f.hour(court.close_hour))} · {c.booked(bookedHours(selected, court.id))}
+                    {c.openHours(f.hour(court.open_hour), f.hour(court.close_hour))} · {c.booked(usedHours(selected, court.id))}
                   </p>
                   <ul className="mt-3 space-y-1.5 text-sm">
                     {timeline.map((seg) => (
                       <li
                         key={seg.start}
                         className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 ${
-                          !seg.row
+                          seg.club
+                            ? "bg-court-200 text-court-900"
+                            : !seg.row
                             ? "border border-dashed border-court-200 text-court-700"
                             : seg.row.kind === "block"
                               ? "bg-sand text-muted"
@@ -193,7 +216,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                       >
                         <span className="shrink-0 whitespace-nowrap tabular-nums">{f.range(seg.start, seg.end)}</span>
                         <span className="truncate font-medium" title={seg.row?.kind === "booking" ? who(seg.row) : undefined}>
-                          {!seg.row ? c.free : seg.row.kind === "block" ? `${c.closed} · ${opt(t, seg.row.note)}` : who(seg.row)}
+                          {seg.club
+                            ? clubNoteOf(court.id) || t.schedule.club
+                            : !seg.row
+                              ? c.free
+                              : seg.row.kind === "block"
+                                ? `${c.closed} · ${opt(t, seg.row.note)}`
+                                : who(seg.row)}
                         </span>
                       </li>
                     ))}

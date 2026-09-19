@@ -5,6 +5,7 @@ import { ScheduleBoard, type SlotState } from "@/components/ScheduleBoard";
 import { getCurrentUser } from "@/lib/auth";
 import { getCourts, getDayBookings } from "@/lib/bookings";
 import { getI18n } from "@/lib/i18n-server";
+import { getRecurringBlocks, recurringHours } from "@/lib/recurring";
 import { addDays, isValidDate, isWeekend, slotMs, todayWIB } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,18 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   for (const b of await getDayBookings(date)) {
     const state: SlotState = b.kind === "block" ? "block" : b.user_id === user?.id ? "mine" : "booked";
     for (let h = b.start_hour; h < b.end_hour; h++) (busy[b.court_id] ??= {})[h] = state;
+  }
+  // Jadwal rutin ditempel SETELAH booking nyata dan hanya pada jam yang masih kosong,
+  // supaya booking yang terlanjur ada tetap terlihat sebagai booking, bukan tertutup.
+  const weekly = await getRecurringBlocks();
+  const clubNote: Record<number, string> = {};
+  for (const c of courts) {
+    for (const h of recurringHours(weekly, c.id, date)) {
+      const slot = (busy[c.id] ??= {});
+      if (!slot[h]) slot[h] = "club";
+    }
+    const note = weekly.find((r) => r.court_id === c.id && r.note)?.note;
+    if (note) clubNote[c.id] = note;
   }
 
   // Seluruh jendela booking (hari ini s.d. batas hari yang diatur admin) ditampilkan dalam satu strip yang bisa digeser.
@@ -74,6 +87,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
         date={date}
         courts={courts.map(({ id, name, surface, indoor, open_hour, close_hour }) => ({ id, name, surface, indoor, open_hour, close_hour }))}
         busy={busy}
+        clubNote={clubNote}
         nowMs={Date.now()}
         loggedIn={!!user}
       />

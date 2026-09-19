@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { removeBlock } from "@/app/actions/admin";
-import { deleteCourt } from "@/app/actions/admin-control";
+import { deleteCourt, removeRecurringBlock } from "@/app/actions/admin-control";
 import { ConfirmButton } from "@/components/admin/ConfirmButton";
-import { BlockForm, CourtForm } from "@/components/admin/CourtForms";
+import { BlockForm, CourtForm, RecurringForm } from "@/components/admin/CourtForms";
 import { getCourts } from "@/lib/bookings";
 import { db } from "@/lib/db";
 import { opt } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n-server";
+import { getRecurringBlocks } from "@/lib/recurring";
 import { ADMIN_MAX_DAYS_AHEAD } from "@/lib/rules";
 import { addDays, todayWIB } from "@/lib/time";
 
@@ -24,6 +25,8 @@ export default async function AdminCourts() {
   const blocks = await db.all(`SELECT b.id, b.date, b.start_hour, b.end_hour, b.note, c.name AS court_name FROM bookings b
        JOIN courts c ON c.id = b.court_id
        WHERE b.kind = 'block' AND b.status = 'confirmed' AND b.date >= ? ORDER BY b.date, b.start_hour`, today) as BlockRow[];
+  const weekly = await getRecurringBlocks(false);
+  const courtName = (id: number) => courts.find((x) => x.id === id)?.name ?? "—";
   const usage = new Map(
     (await db.all("SELECT court_id, COUNT(*) AS n FROM bookings GROUP BY court_id") as { court_id: number; n: number }[]).map((r) => [r.court_id, r.n])
   );
@@ -101,6 +104,39 @@ export default async function AdminCourts() {
                   <form action={removeBlock}>
                     <input type="hidden" name="bookingId" value={b.id} />
                     <button className="btn btn-ghost btn-sm">{c.unblock}</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="card p-5 lg:col-span-2">
+          <h2 className="text-lg font-semibold">{t.recurring.title}</h2>
+          <p className="mt-1 text-xs text-muted">{t.recurring.lead}</p>
+          <div className="mt-4">
+            <RecurringForm courts={courts.filter((court) => court.active).map((court) => ({ id: court.id, name: court.name }))} />
+          </div>
+
+          <h3 className="mt-6 border-t border-line pt-5 text-sm font-semibold">{t.recurring.existing(weekly.length)}</h3>
+          {weekly.length === 0 ? (
+            <p className="mt-2 text-sm text-muted">{t.recurring.none}</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-line text-sm">
+              {weekly.map((w) => (
+                <li key={w.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                  <div>
+                    <p className="font-medium">
+                      {t.recurring.everyDay(t.recurring.weekdayNames[w.weekday - 1])} · {f.range(w.start_hour, w.end_hour)}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {courtName(w.court_id)}
+                      {w.note ? ` · ${w.note}` : ""}
+                    </p>
+                  </div>
+                  <form action={removeRecurringBlock}>
+                    <input type="hidden" name="id" value={w.id} />
+                    <button className="btn btn-ghost btn-sm text-clay-700 hover:border-clay-600">{t.recurring.remove}</button>
                   </form>
                 </li>
               ))}

@@ -137,6 +137,7 @@ const makeId = (r: Rules) => ({
     mine: "Kamu",
     taken: "Terisi",
     closed: "Tutup",
+    club: "Klub",
     past: "Lewat",
     summary: "Ringkasan booking",
     hintEmpty: `Klik slot hijau untuk mulai. Klik slot di sebelahnya untuk memperpanjang sampai ${r.maxDuration} jam.`,
@@ -462,6 +463,7 @@ const makeId = (r: Rules) => ({
   courtHours: makeExtraId(r).courtHours,
   mabar: makeExtraId(r).mabar,
   adminX: makeExtraId(r).adminX,
+  recurring: makeExtraId(r).recurring,
   notFound: {
     title: "Halaman ini jatuh di luar garis.",
     body: "Alamatnya mungkin salah, atau halamannya sudah dipindahkan.",
@@ -597,6 +599,7 @@ const makeEn = (r: Rules): Dict => ({
     mine: "You",
     taken: "Taken",
     closed: "Closed",
+    club: "Club",
     past: "Past",
     summary: "Booking summary",
     hintEmpty: `Click a green slot to start. Click the slot next to it to extend up to ${r.maxDuration} hours.`,
@@ -926,6 +929,7 @@ const makeEn = (r: Rules): Dict => ({
   courtHours: makeExtraEn(r).courtHours,
   mabar: makeExtraEn(r).mabar,
   adminX: makeExtraEn(r).adminX,
+  recurring: makeExtraEn(r).recurring,
   notFound: {
     title: "This page landed outside the lines.",
     body: "The address may be wrong, or the page has moved.",

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { blockSlot, saveCourt } from "@/app/actions/admin";
+import { addRecurringBlock } from "@/app/actions/admin-control";
 import { opt } from "@/lib/i18n";
 import { SURFACES } from "@/lib/options";
 import { CLOSE_HOUR, EARLIEST_HOUR, HOURS, OPEN_HOUR, hourRange } from "@/lib/time";
@@ -121,6 +122,61 @@ export function BlockForm({ courts, minDate, maxDate }: { courts: { id: number; 
       </div>
       <FormMessage state={state} />
       <SubmitButton className="btn btn-primary btn-sm">{c.blockSubmit}</SubmitButton>
+    </form>
+  );
+}
+
+/** Jadwal rutin mingguan: sekali atur, berlaku terus tiap minggu (mis. latihan rutin klub). */
+export function RecurringForm({ courts }: { courts: { id: number; name: string }[] }) {
+  const [state, action] = useActionState(addRecurringBlock, null);
+  const { t, f } = useI18n();
+  const r = t.recurring;
+  return (
+    <form action={action} className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="rec-court" className="label">{r.court}</label>
+          <select id="rec-court" name="courtId" className="input">
+            {courts.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="rec-note" className="label">{r.note}</label>
+          <input id="rec-note" name="note" maxLength={80} defaultValue={r.notePh} className="input" />
+        </div>
+        <div>
+          <label htmlFor="rec-start" className="label">{r.from}</label>
+          <select id="rec-start" name="start" defaultValue={16} className="input">
+            {hourRange(EARLIEST_HOUR, CLOSE_HOUR).map((h) => (
+              <option key={h} value={h}>{f.hour(h)}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="rec-end" className="label">{r.to}</label>
+          <select id="rec-end" name="end" defaultValue={22} className="input">
+            {hourRange(EARLIEST_HOUR + 1, CLOSE_HOUR + 1).map((h) => (
+              <option key={h} value={h}>{f.hour(h)}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <fieldset>
+        <legend className="label">{r.days}</legend>
+        <div className="flex flex-wrap gap-1.5">
+          {r.weekdayNames.map((day, i) => (
+            <label key={day} className="btn btn-ghost btn-sm cursor-pointer has-[:checked]:bg-court-900 has-[:checked]:text-cream">
+              <input type="checkbox" name="weekday" value={i + 1} className="sr-only" />
+              {day}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <p className="text-xs text-muted">{r.existingNote}</p>
+      <FormMessage state={state} />
+      <SubmitButton className="btn btn-primary btn-sm">{r.add}</SubmitButton>
     </form>
   );
 }

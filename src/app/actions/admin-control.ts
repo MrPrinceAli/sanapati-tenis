@@ -11,7 +11,9 @@ import type { FormState } from "@/lib/form";
 import { getI18n } from "@/lib/i18n-server";
 import { BACKHANDS, GALLERY_CATEGORIES, HANDS, LEVELS } from "@/lib/options";
 import { burnResetTokens } from "@/lib/password-reset";
+import { getRecurringBlocks } from "@/lib/recurring";
 import { RULE_BOUNDS, type Rules } from "@/lib/rules";
+import { CLOSE_HOUR, EARLIEST_HOUR } from "@/lib/time";
 import { saveSettings } from "@/lib/settings";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -206,4 +208,56 @@ export async function saveSiteSettings(_: FormState, form: FormData): Promise<Fo
   });
   revalidatePath("/", "layout");
   return { ok: t.ok.settingsSaved };
+}
+
+// ---------- Jadwal rutin mingguan ----------
+
+export async function addRecurringBlock(_: FormState, form: FormData): Promise<FormState> {
+  const { t } = await getI18n();
+  if (!(await admin())) return { error: t.errors.denied };
+
+  const courtId = Number(form.get("courtId"));
+  const start = Number(form.get("start"));
+  const end = Number(form.get("end"));
+  const note = String(form.get("note") ?? "").trim().slice(0, 80) || t.recurring.notePh;
+  const days = form.getAll("weekday").map(Number).filter((d) => Number.isInteger(d) && d >= 1 && d <= 7);
+
+  if (days.length === 0) return { error: t.recurring.chooseDay };
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < EARLIEST_HOUR || end > CLOSE_HOUR || start >= end) {
+    return { error: t.errors.hoursInvalid };
+  }
+  const court = await db.get<{ id: number }>("SELECT id FROM courts WHERE id = ?", courtId);
+  if (!court) return { error: t.errors.courtUnavailable };
+
+  // Hari yang aturannya sudah ada dilewati, supaya tombol yang tertekan dua kali tidak membuat data ganda.
+  const existing = await getRecurringBlocks(false);
+  const baru = days.filter((d) => !existing.some((r) => r.court_id === courtId && r.weekday === d && r.start_hour === start && r.end_hour === end));
+  if (baru.length) {
+    await db.batch(
+      baru.map((d) => ({
+        sql: "INSERT INTO recurring_blocks (court_id, weekday, start_hour, end_hour, note) VALUES (?,?,?,?,?)",
+        args: [courtId, d, start, end, note],
+      }))
+    );
+  }
+
+  // Booking yang sudah ada TIDAK dibatalkan; admin hanya diberi tahu jumlahnya.
+  const clash = await db.get<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM bookings
+     WHERE court_id = ? AND kind = 'booking' AND status = 'confirmed' AND date >= date('now')
+       AND start_hour < ? AND end_hour > ?
+       AND CAST(strftime('%w', date) AS INTEGER) IN (${days.map((d) => (d === 7 ? 0 : d)).join(",")})`,
+    courtId,
+    end,
+    start
+  );
+  revalidatePath("/", "layout");
+  const n = clash?.n ?? 0;
+  return { ok: n > 0 ? `${t.ok.recurringAdded} ${t.recurring.conflictWarning(n)}` : t.ok.recurringAdded };
+}
+
+export async function removeRecurringBlock(form: FormData) {
+  if (!(await admin())) return;
+  await db.run("DELETE FROM recurring_blocks WHERE id = ?", Number(form.get("id")));
+  revalidatePath("/", "layout");
 }

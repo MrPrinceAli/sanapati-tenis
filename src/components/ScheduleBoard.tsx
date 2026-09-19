@@ -8,19 +8,21 @@ import { hourRange, slotMs } from "@/lib/time";
 import { useI18n } from "./I18nProvider";
 import { FormMessage, SubmitButton } from "./ui";
 
-export type SlotState = "booked" | "mine" | "block";
+export type SlotState = "booked" | "mine" | "block" | "club";
 type CourtLite = { id: number; name: string; surface: string; indoor: number; open_hour: number; close_hour: number };
 type Selection = { courtId: number; start: number; end: number } | null;
 
 type Props = {
   date: string;
+  /** Keterangan jadwal rutin per lapangan, mis. "Jadwal Rutin Sanapati Tenis Club". */
+  clubNote: Record<number, string>;
   courts: CourtLite[];
   busy: Record<number, Record<number, SlotState>>;
   nowMs: number;
   loggedIn: boolean;
 };
 
-export function ScheduleBoard({ date, courts, busy, nowMs, loggedIn }: Props) {
+export function ScheduleBoard({ date, courts, busy, clubNote, nowMs, loggedIn }: Props) {
   const { t, f, rules } = useI18n();
   const [sel, setSel] = useState<Selection>(null);
   const [hint, setHint] = useState(false);
@@ -55,6 +57,7 @@ export function ScheduleBoard({ date, courts, busy, nowMs, loggedIn }: Props) {
             ["bg-court-900", t.schedule.legendSelected],
             ["bg-ball", t.schedule.legendMine],
             ["bg-sand", t.schedule.legendTaken],
+            ["bg-court-200", t.schedule.club],
           ].map(([cls, label]) => (
             <span key={label} className="flex items-center gap-1.5">
               <span className={`h-3 w-3 rounded ${cls}`} />
@@ -93,17 +96,28 @@ export function ScheduleBoard({ date, courts, busy, nowMs, loggedIn }: Props) {
 
                   if (taken || past) {
                     const label =
-                      taken === "mine" ? t.schedule.legendMine : taken === "block" ? t.schedule.closed : taken ? t.schedule.taken : t.schedule.past;
+                      taken === "mine"
+                        ? t.schedule.legendMine
+                        : taken === "club"
+                          ? clubNote[c.id] || t.schedule.club
+                          : taken === "block"
+                            ? t.schedule.closed
+                            : taken
+                              ? t.schedule.taken
+                              : t.schedule.past;
                     return (
                       <div
                         key={c.id}
                         role="gridcell"
                         aria-label={`${c.name} ${f.hour(h)}: ${label}`}
+                        title={taken === "club" ? clubNote[c.id] || undefined : undefined}
                         className={`flex h-11 items-center justify-center rounded-lg text-xs font-medium ${
-                          taken === "mine" ? "bg-ball text-court-950" : taken ? "bg-sand text-muted" : "bg-cream text-muted/50"
+                          taken === "mine" ? "bg-ball text-court-950" : taken === "club" ? "bg-court-200 text-court-800" : taken ? "bg-sand text-muted" : "bg-cream text-muted/50"
                         }`}
                       >
-                        {taken === "block" ? (
+                        {taken === "club" ? (
+                          t.schedule.club
+                        ) : taken === "block" ? (
                           <span className="flex h-full w-full items-center justify-center rounded-lg bg-[repeating-linear-gradient(135deg,transparent_0_4px,rgba(19,33,27,.12)_4px_6px)]">
                             {t.schedule.closed}
                           </span>
