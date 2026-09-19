@@ -14,6 +14,9 @@ export function Logo({ light = false }: { light?: boolean }) {
   const { t } = useI18n();
   return (
     <Link href="/" className="flex items-center gap-2.5" aria-label={t.nav.home}>
+      {/* Logo bola tenis. Favicon memakai gambar yang sama di src/app/icon.svg —
+          di sana bolanya dibuat penuh tanpa sisa tepi dan garisnya sedikit lebih tebal
+          supaya tetap terbaca pada 16 px. Kalau warna di sini diubah, ubah juga di sana. */}
       <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden>
         <circle cx="16" cy="16" r="15" fill="#d8f24b" />
         <path d="M5 6.5c6 4 6 15 0 19M27 6.5c-6 4-6 15 0 19" fill="none" stroke="#0e3b2c" strokeWidth="2" strokeLinecap="round" />
