@@ -4,14 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "../I18nProvider";
 
-export function AdminNav() {
+export function AdminNav({ pendingPhotos = 0 }: { pendingPhotos?: number }) {
   const pathname = usePathname();
   const { t } = useI18n();
   const TABS = [
     { href: "/admin", label: t.admin.tabs.overview },
     { href: "/admin/booking", label: t.admin.tabs.bookings },
     { href: "/admin/lapangan", label: t.admin.tabs.courts },
-    { href: "/admin/galeri", label: t.admin.tabs.gallery },
+    { href: "/admin/galeri", label: t.admin.tabs.gallery, badge: pendingPhotos },
     { href: "/admin/pengguna", label: t.admin.tabs.users },
     { href: "/admin/mabar", label: t.adminX.tabMabar },
     { href: "/admin/pengaturan", label: t.adminX.tabSettings },
@@ -30,6 +30,15 @@ export function AdminNav() {
             }`}
           >
             {tab.label}
+            {/* Kiriman foto dari pengunjung menunggu tindakan admin — ditandai di tab supaya tidak terlewat. */}
+            {tab.badge ? (
+              <span
+                aria-label={t.admin.gallery.pendingTitle(tab.badge)}
+                className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-ball px-1.5 text-[11px] font-bold text-court-950"
+              >
+                {tab.badge}
+              </span>
+            ) : null}
           </Link>
         );
       })}

@@ -5,6 +5,8 @@ import { DEFAULT_RULES, RULE_BOUNDS, type Rules } from "./rules";
 
 export type SiteSettings = Rules & {
   registrationOpen: boolean;
+  /** Pengunjung tanpa akun boleh mengirim foto ke galeri (tetap lewat antrean persetujuan admin). */
+  publicUploads: boolean;
   announcementId: string;
   announcementEn: string;
   contactEmail: string;
@@ -13,6 +15,7 @@ export type SiteSettings = Rules & {
 const DEFAULTS: SiteSettings = {
   ...DEFAULT_RULES,
   registrationOpen: true,
+  publicUploads: true,
   announcementId: "",
   announcementEn: "",
   contactEmail: "halo@sanapati.id",
@@ -28,7 +31,9 @@ export const getSettings = cache(async (): Promise<SiteSettings> => {
     const [min, max] = RULE_BOUNDS[key];
     if (stored.has(key) && Number.isInteger(n) && n >= min && n <= max) out[key] = n;
   }
-  if (stored.has("registrationOpen")) out.registrationOpen = stored.get("registrationOpen") === "1";
+  for (const key of ["registrationOpen", "publicUploads"] as const) {
+    if (stored.has(key)) out[key] = stored.get(key) === "1";
+  }
   for (const key of ["announcementId", "announcementEn", "contactEmail"] as const) {
     if (stored.has(key)) out[key] = stored.get(key)!;
   }

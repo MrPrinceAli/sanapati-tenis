@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { opt } from "@/lib/i18n";
 import { useI18n } from "./I18nProvider";
 
-type Item = { id: number; title: string; category: string; src: string };
+type Item = { id: number; title: string; category: string; src: string; uploader: string };
 
 export function GalleryGrid({ items }: { items: Item[] }) {
   const { t } = useI18n();
@@ -53,6 +53,7 @@ export function GalleryGrid({ items }: { items: Item[] }) {
                 alt={item.title}
                 width={600}
                 height={600}
+                loading="lazy"
                 unoptimized
                 className="h-auto w-full transition duration-500 group-hover:scale-105"
               />
@@ -79,12 +80,23 @@ export function GalleryGrid({ items }: { items: Item[] }) {
           <figure>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={current.src} alt={current.title} className="max-h-[76dvh] w-full object-contain" />
-            <figcaption className="flex items-center justify-between gap-3 p-4">
-              <div>
+            <figcaption className="flex flex-wrap items-center justify-between gap-3 p-4">
+              <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-ball">{opt(t, current.category)}</p>
-                <p className="font-medium">{current.title}</p>
+                <p className="truncate font-medium">{current.title}</p>
+                {current.uploader && <p className="text-xs text-cream/50">{t.gallery.credit(current.uploader)}</p>}
               </div>
               <div className="flex gap-2">
+                {/* Unduhan lewat rute sendiri: foto produksi ada di Vercel Blob, dan atribut `download`
+                    diabaikan browser untuk tautan lintas-origin. */}
+                <a
+                  href={`/api/gallery/${current.id}/unduh`}
+                  download
+                  aria-label={t.gallery.downloadAria(current.title)}
+                  className="btn btn-sm border border-cream/20 hover:bg-cream/10"
+                >
+                  {t.gallery.download}
+                </a>
                 <button className="btn btn-sm border border-cream/20 hover:bg-cream/10" onClick={() => step(-1)} aria-label={t.gallery.prev}>←</button>
                 <button className="btn btn-sm border border-cream/20 hover:bg-cream/10" onClick={() => step(1)} aria-label={t.gallery.next}>→</button>
                 <button className="btn btn-ball btn-sm" onClick={() => dialog.current?.close()}>{t.common.close}</button>

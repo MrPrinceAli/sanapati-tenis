@@ -5,6 +5,7 @@ import { AdminNav } from "@/components/admin/AdminNav";
 import { LanguageSwitch } from "@/components/I18nProvider";
 import { Logo } from "@/components/NavBar";
 import { requireAdmin } from "@/lib/auth";
+import { countPending } from "@/lib/gallery";
 import { getI18n } from "@/lib/i18n-server";
 
 export const metadata: Metadata = { title: { default: "Admin", template: "%s · Admin Sanapati" }, robots: { index: false } };
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const admin = await requireAdmin();
-  const { t } = await getI18n();
+  const [{ t }, pendingPhotos] = await Promise.all([getI18n(), countPending()]);
   return (
     <>
       <header className="bg-court-950 text-cream">
@@ -33,7 +34,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               </form>
             </div>
           </div>
-          <AdminNav />
+          <AdminNav pendingPhotos={pendingPhotos} />
         </div>
       </header>
       <main className="container-page flex-1 pb-20 pt-8">{children}</main>

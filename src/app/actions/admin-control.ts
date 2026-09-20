@@ -202,11 +202,13 @@ export async function saveSiteSettings(_: FormState, form: FormData): Promise<Fo
   await saveSettings({
     ...rules,
     registrationOpen: !!form.get("registrationOpen"),
+    publicUploads: !!form.get("publicUploads"),
     announcementId: String(form.get("announcementId") ?? "").trim().slice(0, 300),
     announcementEn: String(form.get("announcementEn") ?? "").trim().slice(0, 300),
     contactEmail,
   });
   revalidatePath("/", "layout");
+  revalidatePath("/galeri");
   return { ok: t.ok.settingsSaved };
 }
 

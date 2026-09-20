@@ -9,6 +9,7 @@ import { getI18n } from "@/lib/i18n-server";
 import { GALLERY_CATEGORIES, SURFACES } from "@/lib/options";
 import { createResetToken } from "@/lib/password-reset";
 import { CLOSE_HOUR, EARLIEST_HOUR } from "@/lib/time";
+import { MAX_FILES_PER_UPLOAD, titleFromFilename } from "@/lib/gallery";
 import { MAX_GALLERY_BYTES, removeUpload, saveImage } from "@/lib/uploads";
 
 // Server action adalah endpoint publik — setiap action wajib cek role sendiri.
@@ -101,17 +102,47 @@ export async function addGalleryItem(_: FormState, form: FormData): Promise<Form
   if (!(await admin())) return { error: t.errors.denied };
   const title = String(form.get("title") ?? "").trim();
   const category = String(form.get("category") ?? "");
-  const file = form.get("file");
+  const files = form.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
 
-  if (title.length < 2 || title.length > 80) return { error: t.errors.titleMin };
+  if (files.length === 0) return { error: t.errors.chooseFile };
+  if (files.length > MAX_FILES_PER_UPLOAD) return { error: t.errors.tooManyFiles };
+  if (title && (title.length < 2 || title.length > 80)) return { error: t.errors.titleMin };
   if (!GALLERY_CATEGORIES.includes(category)) return { error: t.errors.optionInvalid };
-  const saved = await saveImage(file, MAX_GALLERY_BYTES);
-  if ("error" in saved) return { error: t.errors[saved.error] };
-  await db.run("INSERT INTO gallery (title, category, src) VALUES (?,?,?)", title, category, saved.src);
+
+  // Judul kosong → diambil dari nama file. Judul diisi tapi filenya banyak → diberi nomor urut
+  // supaya tiap foto tetap punya judul yang berbeda.
+  const named = (file: File, i: number) => {
+    if (!title) return titleFromFilename(file.name, t.admin.gallery.photoTitle);
+    return files.length > 1 ? `${title} ${i + 1}`.slice(0, 80) : title;
+  };
+
+  let added = 0;
+  let failure: string | null = null;
+  for (const [i, file] of files.entries()) {
+    const saved = await saveImage(file, MAX_GALLERY_BYTES);
+    if ("error" in saved) {
+      // Satu file rusak tidak membatalkan sisanya; kesalahan pertama dilaporkan di akhir.
+      failure ??= t.errors[saved.error];
+      continue;
+    }
+    await db.run("INSERT INTO gallery (title, category, src, status) VALUES (?,?,?,'approved')", named(file, i), category, saved.src);
+    added++;
+  }
+
   revalidatePath("/galeri");
   revalidatePath("/admin/galeri");
   revalidatePath("/");
-  return { ok: t.ok.photoAdded };
+  if (added === 0) return { error: failure ?? t.errors.chooseFile };
+  const ok = added === 1 ? t.ok.photoAdded : t.ok.photosAdded(added);
+  return failure ? { ok: `${ok} ${failure}` } : { ok };
+}
+
+export async function approveGalleryItem(form: FormData) {
+  if (!(await admin())) return;
+  await db.run("UPDATE gallery SET status = 'approved' WHERE id = ? AND status = 'pending'", Number(form.get("id")));
+  revalidatePath("/galeri");
+  revalidatePath("/admin/galeri");
+  revalidatePath("/");
 }
 
 export async function deleteGalleryItem(form: FormData) {

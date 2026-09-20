@@ -129,7 +129,7 @@ export function GalleryEditForm({ item }: { item: { id: number; title: string; c
   );
 }
 
-export type SettingsFormData = Rules & { registrationOpen: boolean; announcementId: string; announcementEn: string; contactEmail: string };
+export type SettingsFormData = Rules & { registrationOpen: boolean; publicUploads: boolean; announcementId: string; announcementEn: string; contactEmail: string };
 
 export function SettingsForm({ settings }: { settings: SettingsFormData }) {
   const [state, action] = useActionState(saveSiteSettings, null);
@@ -165,6 +165,13 @@ export function SettingsForm({ settings }: { settings: SettingsFormData }) {
           <span>
             <span className="font-medium">{a.fRegistration}</span>
             <span className="block text-xs text-muted">{a.fRegistrationHint}</span>
+          </span>
+        </label>
+        <label className="flex items-start gap-3 text-sm">
+          <input key={String(settings.publicUploads)} type="checkbox" name="publicUploads" defaultChecked={settings.publicUploads} className="mt-0.5 h-4 w-4 accent-court-700" />
+          <span>
+            <span className="font-medium">{a.fPublicUploads}</span>
+            <span className="block text-xs text-muted">{a.fPublicUploadsHint}</span>
           </span>
         </label>
         <div className="grid gap-4 sm:grid-cols-2">

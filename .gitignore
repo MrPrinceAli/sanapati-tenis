@@ -44,3 +44,7 @@ next-env.d.ts
 /data
 !.env.example
 /.next-test
+
+# database & keluaran build khusus tes
+/testdata
+/.build-scratch

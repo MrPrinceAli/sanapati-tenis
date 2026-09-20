@@ -142,10 +142,26 @@ src/lib/          db (skema + migrasi + seed), auth, bookings, time (WIB & atura
 src/app/actions/  server actions: auth, booking, account, admin, mabar, locale — semua validasi & cek hak akses di sini
 src/app/(site)/   halaman publik & pemain
 src/app/admin/    dashboard admin (dijaga requireAdmin di layout + di setiap action)
-src/app/api/      /api/reminders (data lonceng), /api/bookings/[code]/ics (kalender)
+src/app/api/      /api/reminders (data lonceng), /api/bookings/[code]/ics (kalender),
+                  /api/gallery/[id]/unduh (unduh foto — perlu rute sendiri karena foto di Blob beda origin)
 src/app/media/    menyajikan foto galeri hasil upload dari data/uploads
 src/components/   komponen UI; yang interaktif bertanda "use client"
+tests/            tes ujung-ke-ujung dengan browser sungguhan (lihat tests/README.md)
 ```
+
+Tiap segmen rute punya `error.tsx` dan `loading.tsx` sendiri, jadi kegagalan database tidak
+pernah menampilkan layar error mentah Next.js dan perpindahan halaman tidak pernah kosong.
+
+## Tes
+
+```bash
+npm test              # build, lalu jalankan semua suite
+npm run test:cepat    # pakai build yang ada
+```
+
+Lima suite dijalankan terhadap aplikasi sungguhan lewat Chrome: sapuan semua halaman (3 peran
+× 2 bahasa), halaman error & memuat, galeri, jadwal rutin klub, dan uji penetrasi server action.
+Perlu Chrome terpasang. Rinciannya di [tests/README.md](tests/README.md).
 
 ## Deploy
 
@@ -186,4 +202,6 @@ npm run build && npm run start     # set DATA_DIR ke volume persisten bila perlu
 ## Belum termasuk
 
 - Pengingat via email/WhatsApp (butuh penyedia pihak ketiga + cron); pengingat saat ini berbasis browser & kalender
+- Galeri: pengunjung boleh mengirim foto tanpa akun, tapi selalu lewat antrean persetujuan admin
+  (bisa dimatikan di Pengaturan). Belum ada pagination — semua foto dimuat sekaligus
 - Mabar: pemain berupa teks bebas, belum terhubung ke akun/profil pemain; turnamen baru sistem gugur (belum ada round-robin / perebutan juara 3)

@@ -1,16 +1,15 @@
-import Link from "next/link";
-import { getI18n } from "@/lib/i18n-server";
+import { NavBar } from "@/components/NavBar";
+import { NotFoundBody } from "@/components/NotFoundBody";
+import { SiteFooter } from "@/components/SiteFooter";
+import { getCurrentUser } from "@/lib/auth";
 
 export default async function NotFound() {
-  const { t } = await getI18n();
+  const user = await getCurrentUser();
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">
-      <p className="font-display text-7xl font-bold text-court-900">Out!</p>
-      <h1 className="mt-3 text-2xl font-semibold">{t.notFound.title}</h1>
-      <p className="mt-2 text-muted">{t.notFound.body}</p>
-      <Link href="/" className="btn btn-primary mt-8">
-        {t.notFound.home}
-      </Link>
-    </main>
+    <>
+      <NavBar user={user ? { id: user.id, name: user.name, hue: user.avatar_hue, avatar: user.avatar, isAdmin: user.role === "admin" } : null} />
+      <NotFoundBody />
+      <SiteFooter />
+    </>
   );
 }

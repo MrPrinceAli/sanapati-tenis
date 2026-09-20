@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "lint:promises": "eslint --no-inline-config -c eslint.promises.config.mjs src"
+    "lint:promises": "eslint --no-inline-config -c eslint.promises.config.mjs src",
+    "test": "node tests/run.mjs",
+    "test:cepat": "node tests/run.mjs --lewati-build"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
@@ -27,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.25",
+    "playwright-core": "^1.63.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5",

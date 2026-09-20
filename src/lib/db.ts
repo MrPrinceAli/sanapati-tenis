@@ -77,6 +77,10 @@ export type GalleryItem = {
   category: string;
   src: string;
   created_at: string;
+  /** 'approved' tampil di galeri publik; 'pending' menunggu persetujuan admin (kiriman pengunjung). */
+  status: "approved" | "pending";
+  /** Nama yang diisi pengunjung saat mengunggah; kosong untuk unggahan admin. */
+  uploader: string;
 };
 
 // DATA_DIR bisa diarahkan ke volume persisten saat deploy (default: ./data di folder project).
@@ -90,7 +94,7 @@ export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
 const REMOTE_URL = process.env.TURSO_DATABASE_URL;
 
 // Naikkan angka ini setiap kali SCHEMA atau daftar kolom di bawah berubah.
-const SCHEMA_VERSION = "6";
+const SCHEMA_VERSION = "7";
 
 const SCHEMA = `
     CREATE TABLE IF NOT EXISTS users (
@@ -144,7 +148,9 @@ const SCHEMA = `
       title TEXT NOT NULL,
       category TEXT NOT NULL DEFAULT 'Lapangan',
       src TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      status TEXT NOT NULL DEFAULT 'approved',
+      uploader TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS password_resets (
@@ -218,6 +224,8 @@ const ADDED_COLUMNS: [table: string, column: string, ddl: string][] = [
   ["courts", "open_hour", "INTEGER NOT NULL DEFAULT 6"],
   ["courts", "close_hour", "INTEGER NOT NULL DEFAULT 23"],
   ["mm_sessions", "open_edit", "INTEGER NOT NULL DEFAULT 1"],
+  ["gallery", "status", "TEXT NOT NULL DEFAULT 'approved'"],
+  ["gallery", "uploader", "TEXT NOT NULL DEFAULT ''"],
 ];
 
 export function newBookingCode(): string {

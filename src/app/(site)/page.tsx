@@ -52,7 +52,8 @@ export default async function HomePage() {
   }
   const openAt = courts.length ? Math.min(...courts.map((c) => c.open_hour)) : 6;
   const closeAt = courts.length ? Math.max(...courts.map((c) => c.close_hour)) : 23;
-  const gallery = await db.all("SELECT * FROM gallery ORDER BY id LIMIT 4") as GalleryItem[];
+  // Hanya foto yang sudah disetujui: kiriman pengunjung tidak boleh tampil di beranda sebelum diperiksa admin.
+  const gallery = await db.all("SELECT * FROM gallery WHERE status = 'approved' ORDER BY id LIMIT 4") as GalleryItem[];
 
   // Mockup papan booking di adegan "cara booking": pakai tanggal & nama lapangan sungguhan.
   const mockDates = Array.from({ length: 5 }, (_, i) => addDays(today, i));
