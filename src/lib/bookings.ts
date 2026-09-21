@@ -4,7 +4,7 @@ import type { ErrorCode } from "./i18n";
 import { ADMIN_MAX_DAYS_AHEAD } from "./rules";
 import { findRecurringClash, getRecurringBlocks } from "./recurring";
 import { getRules } from "./settings";
-import { addDays, isValidDate, slotMs, todayWIB } from "./time";
+import { addDays, hourWIB, isValidDate, slotMs, todayWIB } from "./time";
 
 export type BookingRow = Booking & {
   court_name: string;
@@ -92,7 +92,10 @@ export async function createBooking({ user, courtId, date, start, end, note = ""
   if (!isValidDate(date)) throw new BookingError("invalidDate");
   if (!Number.isInteger(start) || !Number.isInteger(end) || start >= end) throw new BookingError("outsideHours");
   const today = todayWIB();
-  if (date < today || date > addDays(today, free ? ADMIN_MAX_DAYS_AHEAD : rules.maxDaysAhead)) throw new BookingError("tooFarAhead");
+  // Tanggal lampau dan tanggal terlalu jauh sama-sama ditolak, tapi alasannya beda —
+  // digabung jadi satu, pemesan tanggal kemarin akan diberi tahu "hanya bisa 14 hari ke depan".
+  if (date < today) throw new BookingError("past");
+  if (date > addDays(today, free ? ADMIN_MAX_DAYS_AHEAD : rules.maxDaysAhead)) throw new BookingError("tooFarAhead");
   if (slotMs(date, start) <= Date.now()) throw new BookingError("past");
   if (!free && end - start > rules.maxDuration) throw new BookingError("maxDuration");
 
@@ -110,10 +113,17 @@ export async function createBooking({ user, courtId, date, start, end, note = ""
     }
 
     if (!free && user.role !== "admin") {
+      // Booking hari ini yang jamnya sudah lewat tidak dihitung. Tanpa syarat end_hour, halaman
+      // "Booking saya" (yang memakai jam selesai) bisa menampilkan 4 jadwal mendatang sementara
+      // aturannya sudah menghitung 5 — pemain ditolak tanpa tahu sebabnya.
       const active = await t.get<{ n: number }>(
-        "SELECT COUNT(*) AS n FROM bookings WHERE user_id = ? AND kind = 'booking' AND status = 'confirmed' AND date >= ?",
+        `SELECT COUNT(*) AS n FROM bookings
+         WHERE user_id = ? AND kind = 'booking' AND status = 'confirmed'
+           AND (date > ? OR (date = ? AND end_hour > ?))`,
         user.id,
-        today
+        today,
+        today,
+        hourWIB()
       );
       if ((active?.n ?? 0) >= rules.maxActiveBookings) throw new BookingError("maxActive");
     }
@@ -157,10 +167,18 @@ export async function cancelBooking(bookingId: number, actor: User, reason: stri
 export async function moveBooking(bookingId: number, to: { courtId: number; date: string; start: number; end: number; note: string }): Promise<void> {
   if (!isValidDate(to.date)) throw new BookingError("invalidDate");
   if (!Number.isInteger(to.start) || !Number.isInteger(to.end) || to.start >= to.end) throw new BookingError("outsideHours");
+  // Admin memang berhak menimpa batas hari dan durasi milik pemain, tapi pagar yang sama dengan
+  // createBooking tetap berlaku: tidak ke masa lalu, dan tidak melewati batas 365 hari yang ada
+  // justru supaya salah ketik tahun (2036, bukan 2026) tidak lolos diam-diam.
+  const today = todayWIB();
+  if (to.date < today) throw new BookingError("past");
+  if (to.date > addDays(today, ADMIN_MAX_DAYS_AHEAD)) throw new BookingError("tooFarAhead");
   await db.tx(async (t) => {
     const booking = await t.get<Booking>("SELECT * FROM bookings WHERE id = ? AND kind = 'booking'", bookingId);
     if (!booking) throw new BookingError("notFound");
-    const court = await t.get<Court>("SELECT * FROM courts WHERE id = ?", to.courtId);
+    // active = 1 sama seperti createBooking: memindahkan booking ke lapangan nonaktif membuatnya
+    // hilang dari papan booking dan kalender, karena keduanya hanya menampilkan lapangan aktif.
+    const court = await t.get<Court>("SELECT * FROM courts WHERE id = ? AND active = 1", to.courtId);
     if (!court) throw new BookingError("courtUnavailable");
     if (to.start < court.open_hour || to.end > court.close_hour) throw new BookingError("outsideHours");
     if (booking.status === "confirmed" && (await clashes(t, to.courtId, to.date, to.start, to.end, bookingId))) throw new BookingError("slotTaken");

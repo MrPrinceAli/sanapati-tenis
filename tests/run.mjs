@@ -26,6 +26,9 @@ const SUITE = [
   ["sapuan", "smoke.mjs"],
   ["error", "errors.mjs"],
   ["galeri", "gallery.mjs"],
+  ["aturan", "booking-rules.mjs"],
+  ["akun", "akun.mjs"],
+  ["undian", "matchmaking.mjs"],
   ["rutin", "recurring.mjs"],
   ["keamanan", "security.mjs"],
 ];

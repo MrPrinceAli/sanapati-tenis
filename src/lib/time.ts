@@ -21,6 +21,11 @@ export function todayWIB(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(now);
 }
 
+/** Jam sekarang menurut WIB (0–23). Server Vercel berjalan di UTC, jadi jangan pakai getHours(). */
+export function hourWIB(now: Date = new Date()): number {
+  return Number(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hour12: false }).format(now));
+}
+
 export function isValidDate(date: unknown): date is string {
   if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const d = new Date(`${date}T12:00:00Z`);

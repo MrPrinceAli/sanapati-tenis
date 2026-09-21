@@ -47,21 +47,33 @@ r.section("Papan booking menutup jam klub");
 for (const [label, tanggal] of [["Selasa", selasa], ["Jumat", jumat]]) {
   await pemain.goto(`${BASE}/booking?tanggal=${tanggal}`);
   const papan = await pemain.evaluate(() => {
-    const hasil = { tertutup: [], ragunanTerbuka: [] };
+    const hasil = { klub: [], sudahDibooking: [], bisaDipesan: [], ragunanTerbuka: [] };
     for (const baris of document.querySelectorAll("[role=row]")) {
       const judul = baris.querySelector("[role=rowheader]");
       if (!judul) continue;
       const jam = parseInt(judul.textContent, 10);
       const sel = [...baris.querySelectorAll("[role=gridcell]")];
-      if (sel[0] && sel[0].tagName !== "BUTTON" && /Jadwal Rutin|Klub|Club/.test(sel[0].textContent)) hasil.tertutup.push(jam);
+      if (sel[0]) {
+        if (sel[0].tagName === "BUTTON") hasil.bisaDipesan.push(jam);
+        else if (/Jadwal Rutin|Klub|Club/.test(sel[0].textContent)) hasil.klub.push(jam);
+        else hasil.sudahDibooking.push(jam);
+      }
       if (sel[1] && sel[1].tagName === "BUTTON") hasil.ragunanTerbuka.push(jam);
     }
     return hasil;
   });
+  // Yang dijamin aturan ini: TIDAK ADA jam 16–21 yang masih bisa dipesan pemain.
+  // Sel itu boleh menampilkan label klub, boleh juga menampilkan booking yang sudah ada
+  // sejak sebelum aturan dibuat — booking lama memang sengaja tidak digusur.
+  const jamKlub = [16, 17, 18, 19, 20, 21];
+  const masihBisa = jamKlub.filter((h) => papan.bisaDipesan.includes(h));
   r.ok(
-    JSON.stringify(papan.tertutup) === JSON.stringify([16, 17, 18, 19, 20, 21]),
-    `${label}: Sawangan jam 16–21 tertutup (${papan.tertutup.join(",")})`
+    masihBisa.length === 0,
+    masihBisa.length === 0
+      ? `${label}: jam 16–21 Sawangan tidak bisa dipesan pemain (label klub: ${papan.klub.join(",") || "-"}; booking lama: ${papan.sudahDibooking.filter((h) => jamKlub.includes(h)).join(",") || "-"})`
+      : `${label}: jam ${masihBisa.join(",")} masih terbuka padahal masuk jadwal klub`
   );
+  r.ok(papan.klub.length > 0, `${label}: label klub tampil di papan (${papan.klub.join(",")})`);
   r.ok(papan.ragunanTerbuka.some((h) => h >= 16 && h < 22), `${label}: Ragunan di jam yang sama tetap bisa dibooking`);
 }
 await pemain.goto(`${BASE}/booking?tanggal=${rabu}`);
@@ -86,11 +98,17 @@ const tolakan = await pemain.locator("aside p[role=alert]").innerText().catch(()
 r.ok(/jadwal rutin klub/i.test(tolakan), `booking paksa ditolak server: "${tolakan.slice(0, 55)}…"`);
 
 r.section("Kalender & bahasa Inggris");
-await pemain.goto(`${BASE}/jadwal?tanggal=${selasa}&bulan=${selasa.slice(0, 7)}`);
-const kalender = await pemain.locator("section").nth(1).innerText();
+// Jumat dipakai untuk memeriksa rentang jam penuh: Selasa punya booking lama di 15–17,
+// sehingga blok klub yang tergambar di sana memang tidak mulai tepat pukul 16.
+await pemain.goto(`${BASE}/jadwal?tanggal=${jumat}&bulan=${jumat.slice(0, 7)}`);
+const kalender = await pemain.locator("main").innerText();
+const adaLabel = /Jadwal Rutin Sanapati Tenis Club/.test(kalender);
+const adaJam = /16[:.]00\s*[–-]\s*22[:.]00/.test(kalender);
 r.ok(
-  /Jadwal Rutin Sanapati Tenis Club/.test(kalender) && /16[:.]00 – 22[:.]00/.test(kalender),
-  "kalender menampilkan label lengkap beserta jamnya"
+  adaLabel && adaJam,
+  adaLabel && adaJam
+    ? "kalender menampilkan label lengkap beserta rentang 16.00–22.00"
+    : `kalender kurang lengkap (label: ${adaLabel}, rentang jam: ${adaJam})\n        cuplikan: ${kalender.replace(/\s+/g, " ").slice(0, 240)}`
 );
 const en = await (await launch()).newContext();
 await en.addCookies([{ name: "sanapati_lang", value: "en", url: BASE }]);

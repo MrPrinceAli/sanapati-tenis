@@ -236,15 +236,37 @@ export async function generateMatches(_: FormState, form: FormData): Promise<For
       lastRound + 1
     );
     // Target main sudah tercapai bukan kegagalan; aturan gender yang mustahil dipenuhi, iya.
-    const reached = session.target_plays > 0 && !addOne && kept.length > 0;
+    // `reached` harus benar-benar memeriksa jumlah main tiap pemain: sebelumnya cukup ada satu skor
+    // tersimpan untuk dianggap "target tercapai", sehingga aturan gender yang mustahil pun dilaporkan
+    // sebagai sukses — lalu seluruh ronde yang belum berskor dihapus tanpa penjelasan.
+    const mainSejauhIni = new Map(players.map((p) => [p.id, 0]));
+    for (const m of kept) {
+      const sisi = sidesOf(m);
+      for (const pid of [...sisi.a, ...sisi.b]) mainSejauhIni.set(pid, (mainSejauhIni.get(pid) ?? 0) + 1);
+    }
+    const reached =
+      session.target_plays > 0 &&
+      !addOne &&
+      players.length > 0 &&
+      players.every((p) => (mainSejauhIni.get(p.id) ?? 0) >= session.target_plays);
     if (planned.length === 0 && !reached) return { error: t.errors.mmBlocked };
     if (!addOne) matches.filter((m) => !isScored(m)).forEach((m) => stmts.push({ sql: "DELETE FROM mm_matches WHERE id = ?", args: [m.id] }));
     for (const r of planned) r.matches.forEach((m, slot) => stmts.push({ sql: INSERT_MATCH, args: matchArgs(session.id, r.round, slot, m, false) }));
   }
+  // Aturan gender bisa menyisihkan sebagian pemain sepenuhnya — misal 3 wanita pada aturan
+  // "sesama gender" format duo: satu tim butuh 4 orang, jadi mereka tidak pernah bisa dipasangkan.
+  // Undiannya sah, tapi sebelumnya mereka lenyap dari jadwal tanpa peringatan apa pun.
+  const tampil = new Set<number>();
+  for (const st of stmts) {
+    if (st.sql !== INSERT_MATCH) continue;
+    for (const v of st.args) if (typeof v === "number") tampil.add(v);
+  }
+  const tertinggal = players.filter((p) => !tampil.has(p.id));
+
   stmts.push({ sql: "UPDATE mm_sessions SET finished = 0 WHERE id = ?", args: [session.id] });
   await db.batch(stmts);
   refresh(session.id);
-  return { ok: "" };
+  return { ok: tertinggal.length ? t.ok.mmLeftOut(tertinggal.map((p) => p.name).join(", ")) : "" };
 }
 
 export async function saveScore(_: FormState, form: FormData): Promise<FormState> {
@@ -259,7 +281,10 @@ export async function saveScore(_: FormState, form: FormData): Promise<FormState
   const clear = !!form.get("clear");
   const a = Number(form.get("score_a"));
   const b = Number(form.get("score_b"));
-  if (!clear && (!between(a, [0, 99]) || !between(b, [0, 99]) || form.get("score_a") === "" || form.get("score_b") === "")) {
+  // Number(null) dan Number(" ") sama-sama 0, jadi field yang hilang atau berisi spasi akan
+  // tersimpan diam-diam sebagai 0-0. Isian diperiksa sebagai teks dulu, bukan hanya != "".
+  const isiAngka = (v: FormDataEntryValue | null) => typeof v === "string" && v.trim() !== "";
+  if (!clear && (!isiAngka(form.get("score_a")) || !isiAngka(form.get("score_b")) || !between(a, [0, 99]) || !between(b, [0, 99]))) {
     return { error: t.errors.mmScore };
   }
 

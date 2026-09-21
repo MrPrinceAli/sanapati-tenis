@@ -21,7 +21,7 @@ export function GalleryContribute() {
       <p className="mt-1.5 max-w-lg text-sm text-muted">{t.gallery.contributeLead}</p>
       <form action={action} className="mt-5 grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <label htmlFor="c-file" className="label">{t.admin.gallery.file}</label>
+          <label htmlFor="c-file" className="label">{t.gallery.fileGuest}</label>
           <input
             id="c-file"
             name="file"

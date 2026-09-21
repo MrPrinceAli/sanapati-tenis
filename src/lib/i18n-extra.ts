@@ -282,6 +282,8 @@ export const makeExtraId = (r: Rules) => ({
       `${n} booking yang sudah ada berada di jam ini. Semuanya dibiarkan; batalkan sendiri dari tab Booking kalau memang perlu.`,
   },
   okExtra: {
+    mmLeftOut: (nama: string) =>
+      `Jadwal dibuat, tapi ${nama} tidak kebagian main sama sekali — aturan gender membuat mereka tidak bisa dipasangkan. Ganti aturan gender ke "Bebas", atau tambah pemain.`,
     recurringAdded: "Jadwal rutin ditambahkan.",
     settingsSaved: "Pengaturan disimpan.",
     bookingCreated: "Booking dibuat.",
@@ -607,6 +609,8 @@ export const makeExtraEn = (r: Rules): Extra => ({
       `${n} existing booking(s) fall in these hours. They are all left alone; cancel them yourself from the Bookings tab if needed.`,
   },
   okExtra: {
+    mmLeftOut: (nama) =>
+      `Schedule created, but ${nama} got no matches at all — the gender rule leaves them unpairable. Switch the gender rule to "Any", or add more players.`,
     recurringAdded: "Recurring schedule added.",
     settingsSaved: "Settings saved.",
     bookingCreated: "Booking created.",

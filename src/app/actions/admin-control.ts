@@ -13,7 +13,7 @@ import { BACKHANDS, GALLERY_CATEGORIES, HANDS, LEVELS } from "@/lib/options";
 import { burnResetTokens } from "@/lib/password-reset";
 import { getRecurringBlocks } from "@/lib/recurring";
 import { RULE_BOUNDS, type Rules } from "@/lib/rules";
-import { CLOSE_HOUR, EARLIEST_HOUR } from "@/lib/time";
+import { CLOSE_HOUR, EARLIEST_HOUR, todayWIB } from "@/lib/time";
 import { saveSettings } from "@/lib/settings";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -246,10 +246,13 @@ export async function addRecurringBlock(_: FormState, form: FormData): Promise<F
   // Booking yang sudah ada TIDAK dibatalkan; admin hanya diberi tahu jumlahnya.
   const clash = await db.get<{ n: number }>(
     `SELECT COUNT(*) AS n FROM bookings
-     WHERE court_id = ? AND kind = 'booking' AND status = 'confirmed' AND date >= date('now')
+     WHERE court_id = ? AND kind = 'booking' AND status = 'confirmed' AND date >= ?
        AND start_hour < ? AND end_hour > ?
        AND CAST(strftime('%w', date) AS INTEGER) IN (${days.map((d) => (d === 7 ? 0 : d)).join(",")})`,
     courtId,
+    // date('now') milik SQLite memakai UTC — satu-satunya tempat "hari ini" tidak diambil dari WIB.
+    // Antara 00.00–07.00 WIB itu masih tanggal kemarin, sehingga booking yang sudah selesai ikut terhitung.
+    todayWIB(),
     end,
     start
   );

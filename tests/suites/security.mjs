@@ -78,6 +78,14 @@ async function putarUlang(tangkapan, cookie, body) {
 const raka = await sesi("raka@contoh.id", "tenis123");
 const bima = await sesi("bima@contoh.id", "tenis123");
 
+// Prasyarat, bukan bagian yang diuji: suite lain (mis. "aturan") sengaja mengisi kuota booking
+// aktif sampai batas. Uji di bawah perlu membuat booking baru, jadi kuota kedua akun ini
+// dikosongkan dulu supaya hasilnya tidak bergantung pada urutan suite.
+await q(
+  `UPDATE bookings SET status = 'cancelled'
+   WHERE status = 'confirmed' AND user_id IN (SELECT id FROM users WHERE email IN ('raka@contoh.id', 'bima@contoh.id'))`
+);
+
 r.section("IDOR: membatalkan booking milik orang lain");
 const tanggal = (n) => new Date(Date.now() + 7 * 3600e3 + n * 86400e3).toISOString().slice(0, 10);
 
