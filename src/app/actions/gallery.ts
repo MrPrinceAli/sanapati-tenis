@@ -8,13 +8,8 @@ import { MAX_PENDING, countPending, titleFromFilename } from "@/lib/gallery";
 import { getI18n } from "@/lib/i18n-server";
 import { GALLERY_CATEGORIES } from "@/lib/options";
 import { getSettings } from "@/lib/settings";
+import { MAX_TAMU_BYTES } from "@/lib/upload-limits";
 import { saveImage } from "@/lib/uploads";
-
-/**
- * Kiriman tanpa akun dibatasi lebih ketat daripada unggahan admin: 2 MB, bukan 4 MB.
- * Foto ponsel biasa masih lolos, tapi biaya satu permintaan iseng jadi separuhnya.
- */
-const MAX_TAMU_BYTES = 2 * 1024 * 1024;
 
 // Peredam laju per alamat IP (15 per 10 menit), pola yang sama dengan aksi mabar terbuka.
 // Angkanya dipilih agar orang yang baru selesai main dan mengirim selusin foto tidak terblokir,

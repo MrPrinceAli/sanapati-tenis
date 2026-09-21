@@ -24,8 +24,11 @@ const chunk = (type, data) => {
  * PNG polos berwarna solid, dibuat saat tes berjalan.
  * Sengaja dibangkitkan daripada disimpan sebagai berkas biner di repo, supaya tidak ada aset
  * gambar yang ikut ter-commit hanya untuk keperluan tes.
+ *
+ * `padBytes` menggelembungkan berkas dengan chunk privat berisi nol — cara murah membuat
+ * "foto" beberapa megabyte untuk menguji batas ukuran unggahan, tanpa piksel sebanyak itu.
  */
-export function makePng(width = 8, height = 8, [r, g, b] = [120, 200, 60]) {
+export function makePng(width = 8, height = 8, [r, g, b] = [120, 200, 60], padBytes = 0) {
   const raw = Buffer.alloc(height * (1 + width * 3));
   for (let y = 0; y < height; y++) {
     const row = y * (1 + width * 3);
@@ -45,6 +48,8 @@ export function makePng(width = 8, height = 8, [r, g, b] = [120, 200, 60]) {
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk("IHDR", ihdr),
     chunk("IDAT", deflateSync(raw)),
+    // prVt: ancillary + private, jadi browser dan pembaca PNG mana pun melewatinya begitu saja.
+    ...(padBytes > 0 ? [chunk("prVt", Buffer.alloc(padBytes))] : []),
     chunk("IEND", Buffer.alloc(0)),
   ]);
 }

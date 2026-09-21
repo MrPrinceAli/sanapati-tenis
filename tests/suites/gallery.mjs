@@ -9,6 +9,9 @@ import { makePng } from "../helpers/images.mjs";
 const r = reporter("Galeri");
 const errors = [];
 const png = (name, rgb) => ({ name, mimeType: "image/png", buffer: makePng(10, 10, rgb) });
+const MB = 1024 * 1024;
+// Foto "berat": dipakai untuk menguji peringatan ukuran yang muncul sejak file dipilih.
+const pngBerat = (name, bytes) => ({ name, mimeType: "image/png", buffer: makePng(10, 10, [90, 90, 90], bytes) });
 
 const pengunjung = await newPage(errors);
 const admin = await newPage(errors);
@@ -58,6 +61,31 @@ r.ok(baru.status === "pending", `status foto = pending, bukan langsung tayang ($
 r.ok(baru.uploader === "Budi Pengunjung", `nama pengirim tercatat (${baru.uploader})`);
 r.ok(baru.title === "sore di sawangan", `judul diambil dari nama file (${baru.title})`);
 
+// ------------------------------------------- peringatan ukuran sejak dipilih
+// Penting karena batas badan request Vercel memutus unggahan kebesaran sebelum server action
+// jalan: tanpa peringatan di sisi klien, pengirim hanya melihat layar diam.
+r.section("Foto kebesaran ditolak saat dipilih, sebelum tombol kirim");
+const sebelumBesar = await count("SELECT COUNT(*) FROM gallery");
+await pengunjung.goto(`${BASE}/galeri`);
+await pengunjung.setInputFiles("#c-file", pngBerat("kebesaran.png", Math.round(2.4 * MB)));
+const peringatan = pengunjung.locator("form:has(#c-file) p[role=alert]");
+await peringatan.waitFor({ timeout: 5000 });
+const isiPeringatan = await peringatan.innerText();
+r.ok(/melebihi batas|over the/i.test(isiPeringatan), `peringatan muncul tanpa klik kirim: "${isiPeringatan.slice(0, 60)}…"`);
+r.ok(/2 MB/.test(isiPeringatan), `batas yang berlaku ikut disebut (${isiPeringatan.match(/[\d.,]+ MB/g)?.join(" vs ") ?? "-"})`);
+r.ok(
+  await pengunjung.locator("#c-file").evaluate((el) => el.files.length) === 0,
+  "file kebesaran dikeluarkan dari pilihan, jadi formulir tidak bisa terkirim membawanya"
+);
+await pengunjung.click("form:has(#c-file) button[type=submit]");
+r.ok(await count("SELECT COUNT(*) FROM gallery") === sebelumBesar, "tidak ada apa pun terkirim ke server");
+
+await pengunjung.setInputFiles("#c-file", png("ukuran-wajar.png", [30, 140, 120]));
+r.ok(
+  await pengunjung.locator("form:has(#c-file) p[role=alert]").count() === 0,
+  "peringatan hilang begitu foto berukuran wajar dipilih"
+);
+
 r.section("Foto yang menunggu TIDAK boleh terlihat publik");
 await pengunjung.goto(`${BASE}/galeri`);
 r.ok(!(await pengunjung.locator(`main :text("${baru.title}")`).count()), "tidak muncul di halaman galeri");
@@ -97,6 +125,41 @@ r.ok(
   `judul diberi nomor urut otomatis (${judul.join(", ")})`
 );
 r.ok(await count("SELECT COUNT(*) FROM gallery WHERE status = 'pending'") === 0, "unggahan admin langsung tayang, tidak ikut antre");
+
+// Jumlahnya 4,8 MB — lewat batas badan satu request. Foto dikirim satu per satu justru supaya
+// jumlah begini tidak pernah jadi soal; yang dibatasi tinggal ukuran per foto.
+r.section("Foto dikirim satu per satu, jadi totalnya tidak dibatasi");
+const sebelumBerat = await count("SELECT COUNT(*) FROM gallery");
+await admin.goto(`${BASE}/admin/galeri`);
+await admin.setInputFiles("#g-file", [
+  pngBerat("berat-1.png", Math.round(1.6 * MB)),
+  pngBerat("berat-2.png", Math.round(1.6 * MB)),
+  pngBerat("berat-3.png", Math.round(1.6 * MB)),
+]);
+r.ok(
+  await admin.locator("form:has(#g-file) p[role=alert]").count() === 0,
+  "tidak ada yang dipotong: tiap foto masih di bawah batas per foto"
+);
+await admin.fill("#g-title", "Berat tiga");
+await admin.click("form:has(#g-file) button[type=submit]");
+await admin.waitForSelector("form:has(#g-file) p[role=status]", { timeout: 60000 });
+const hasilBerat = await admin.locator("form:has(#g-file) p[role=status]").innerText();
+r.ok(
+  await count("SELECT COUNT(*) FROM gallery") === sebelumBerat + 3,
+  `tiga foto 1,6 MB (total 4,8 MB) masuk semua dari satu kali klik: "${hasilBerat.slice(0, 50)}…"`
+);
+const judulBerat = (await q("SELECT title FROM gallery ORDER BY id DESC LIMIT 3")).map((x) => x.title).sort();
+r.ok(
+  JSON.stringify(judulBerat) === JSON.stringify(["Berat tiga 1", "Berat tiga 2", "Berat tiga 3"]),
+  `nomor urut judul tetap benar walau tiap foto request terpisah (${judulBerat.join(", ")})`
+);
+
+// Satu foto di atas 4 MB tetap mustahil: dipecah bagaimana pun ia tidak muat dalam satu request.
+await admin.setInputFiles("#g-file", [pngBerat("raksasa.png", Math.round(4.3 * MB))]);
+const tolakSatuan = admin.locator("form:has(#g-file) p[role=alert]");
+await tolakSatuan.waitFor({ timeout: 5000 });
+r.ok(/melebihi batas|over the/i.test(await tolakSatuan.innerText()), "foto tunggal di atas 4 MB tetap ditolak sejak dipilih");
+r.ok(await admin.locator("#g-file").evaluate((el) => el.files.length) === 0, "foto raksasa tidak ikut ke pilihan");
 
 // ------------------------------------------------------------- saklar admin
 r.section("Saklar 'izinkan pengunjung mengirim foto'");

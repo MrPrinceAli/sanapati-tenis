@@ -57,8 +57,14 @@ export const makeExtraId = (r: Rules) => ({
     upload: "Unggah foto",
     change: "Ganti foto",
     remove: "Hapus foto",
-    hint: "JPG, PNG, atau WebP. Maksimal 2 MB.",
+    hint: (max: string) => `JPG, PNG, atau WebP. Maksimal ${max}.`,
     uploading: "Mengunggah…",
+  },
+  upload: {
+    tooBig: (name: string, size: string, max: string) =>
+      `“${name}” berukuran ${size}, melebihi batas ${max}, jadi file itu dikeluarkan dari pilihan. Perkecil dulu fotonya atau pilih yang lain.`,
+    sendFailed: "gagal terkirim, coba ulangi foto ini",
+    failedList: (items: string[]) => `${items.length} gagal — ${items.join("; ")}.`,
   },
   courtHours: { open: "Jam buka", close: "Jam tutup" },
   mabar: {
@@ -384,8 +390,14 @@ export const makeExtraEn = (r: Rules): Extra => ({
     upload: "Upload photo",
     change: "Change photo",
     remove: "Remove photo",
-    hint: "JPG, PNG, or WebP. 2 MB max.",
+    hint: (max: string) => `JPG, PNG, or WebP. ${max} max.`,
     uploading: "Uploading…",
+  },
+  upload: {
+    tooBig: (name: string, size: string, max: string) =>
+      `“${name}” is ${size}, over the ${max} limit, so it was dropped from your selection. Shrink it first or pick another photo.`,
+    sendFailed: "did not go through, try this one again",
+    failedList: (items: string[]) => `${items.length} failed — ${items.join("; ")}.`,
   },
   courtHours: { open: "Opens at", close: "Closes at" },
   mabar: {

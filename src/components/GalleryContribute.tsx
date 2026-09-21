@@ -4,8 +4,9 @@ import { useActionState } from "react";
 import { submitGalleryPhoto } from "@/app/actions/gallery";
 import { opt } from "@/lib/i18n";
 import { GALLERY_CATEGORIES } from "@/lib/options";
+import { MAX_TAMU_BYTES } from "@/lib/upload-limits";
 import { useI18n } from "./I18nProvider";
-import { FormMessage, SubmitButton } from "./ui";
+import { FileField, FormMessage, SubmitButton } from "./ui";
 
 /**
  * Formulir kirim foto untuk pengunjung — tidak perlu akun.
@@ -13,7 +14,7 @@ import { FormMessage, SubmitButton } from "./ui";
  */
 export function GalleryContribute() {
   const [state, action] = useActionState(submitGalleryPhoto, null);
-  const { t } = useI18n();
+  const { t, f } = useI18n();
   const v = state?.values ?? {};
   return (
     <section className="card mt-16 p-6 sm:p-8">
@@ -21,15 +22,8 @@ export function GalleryContribute() {
       <p className="mt-1.5 max-w-lg text-sm text-muted">{t.gallery.contributeLead}</p>
       <form action={action} className="mt-5 grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <label htmlFor="c-file" className="label">{t.gallery.fileGuest}</label>
-          <input
-            id="c-file"
-            name="file"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            required
-            className="input py-2 file:mr-3 file:rounded-full file:border-0 file:bg-court-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-court-800"
-          />
+          <label htmlFor="c-file" className="label">{t.gallery.fileGuest(f.fileSize(MAX_TAMU_BYTES))}</label>
+          <FileField id="c-file" name="file" required maxBytes={MAX_TAMU_BYTES} />
         </div>
         <div>
           <label htmlFor="c-title" className="label">{t.gallery.photoTitle}</label>

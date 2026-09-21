@@ -4,9 +4,10 @@ import { useActionState, useRef, useState } from "react";
 import { changePassword, updateAccount, updateAvatar, updateProfile } from "@/app/actions/account";
 import { opt } from "@/lib/i18n";
 import { BACKHANDS, HANDS, LEVELS, REMINDER_MINUTES } from "@/lib/options";
+import { MAX_AVATAR_BYTES } from "@/lib/upload-limits";
 import { Avatar } from "./Avatar";
 import { useI18n } from "./I18nProvider";
-import { FormMessage, SubmitButton } from "./ui";
+import { FileField, FormMessage, SubmitButton } from "./ui";
 
 type AccountData = { name: string; email: string; phone: string; reminder_minutes: number };
 type ProfileData = {
@@ -118,7 +119,7 @@ export function ProfileForm({ data }: { data: ProfileData }) {
 // Form terpisah dari ProfileForm: upload langsung tersimpan begitu file dipilih.
 export function AvatarForm({ name, hue, avatar }: { name: string; hue: number; avatar: string }) {
   const [state, action] = useActionState(updateAvatar, null);
-  const { t } = useI18n();
+  const { t, f } = useI18n();
   const form = useRef<HTMLFormElement>(null);
   return (
     <form ref={form} action={action} className="flex flex-wrap items-center gap-4">
@@ -126,23 +127,21 @@ export function AvatarForm({ name, hue, avatar }: { name: string; hue: number; a
       <div className="min-w-0 flex-1 space-y-2">
         <p className="label mb-0">{t.avatar.label}</p>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="btn btn-ghost btn-sm">
-            {avatar ? t.avatar.change : t.avatar.upload}
-            <input
-              type="file"
-              name="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="sr-only"
-              onChange={(e) => e.target.files?.length && form.current?.requestSubmit()}
-            />
-          </label>
+          <FileField
+            name="file"
+            className="sr-only"
+            label={avatar ? t.avatar.change : t.avatar.upload}
+            labelClassName="btn btn-ghost btn-sm"
+            maxBytes={MAX_AVATAR_BYTES}
+            onPick={() => form.current?.requestSubmit()}
+          />
           {avatar && (
             <button name="remove" value="1" className="btn btn-sm text-clay-700 hover:underline">
               {t.avatar.remove}
             </button>
           )}
         </div>
-        <p className="text-xs text-muted">{t.avatar.hint}</p>
+        <p className="text-xs text-muted">{t.avatar.hint(f.fileSize(MAX_AVATAR_BYTES))}</p>
         <FormMessage state={state} />
       </div>
     </form>

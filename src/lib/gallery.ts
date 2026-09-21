@@ -9,9 +9,6 @@ import { db } from "./db";
  */
 export const MAX_PENDING = 30;
 
-/** Satu unggahan admin maksimal sekian file, supaya satu request tidak kebablasan. */
-export const MAX_FILES_PER_UPLOAD = 20;
-
 export const countPending = async () =>
   Number((await db.get<{ n: number }>("SELECT COUNT(*) AS n FROM gallery WHERE status = 'pending'"))?.n ?? 0);
 

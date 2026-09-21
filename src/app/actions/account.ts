@@ -8,7 +8,8 @@ import type { FormState } from "@/lib/form";
 import { getI18n } from "@/lib/i18n-server";
 import { BACKHANDS, HANDS, LEVELS, REMINDER_MINUTES } from "@/lib/options";
 import { burnResetTokens } from "@/lib/password-reset";
-import { MAX_AVATAR_BYTES, removeUpload, saveImage } from "@/lib/uploads";
+import { MAX_AVATAR_BYTES } from "@/lib/upload-limits";
+import { removeUpload, saveImage } from "@/lib/uploads";
 
 export async function updateAccount(_: FormState, form: FormData): Promise<FormState> {
   const { t } = await getI18n();

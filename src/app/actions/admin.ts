@@ -9,8 +9,9 @@ import { getI18n } from "@/lib/i18n-server";
 import { GALLERY_CATEGORIES, SURFACES } from "@/lib/options";
 import { createResetToken } from "@/lib/password-reset";
 import { CLOSE_HOUR, EARLIEST_HOUR } from "@/lib/time";
-import { MAX_FILES_PER_UPLOAD, titleFromFilename } from "@/lib/gallery";
-import { MAX_GALLERY_BYTES, removeUpload, saveImage } from "@/lib/uploads";
+import { titleFromFilename } from "@/lib/gallery";
+import { MAX_GALLERY_BYTES } from "@/lib/upload-limits";
+import { removeUpload, saveImage } from "@/lib/uploads";
 
 // Server action adalah endpoint publik — setiap action wajib cek role sendiri.
 async function admin(): Promise<User | null> {
@@ -97,44 +98,55 @@ export async function removeBlock(form: FormData) {
   revalidatePath("/booking");
 }
 
-export async function addGalleryItem(_: FormState, form: FormData): Promise<FormState> {
+/**
+ * Satu foto per pemanggilan, dan itu disengaja.
+ *
+ * Batas badan request (4,5 MB di Vercel) berlaku per request, bukan per unggahan: menjejalkan
+ * delapan foto ke satu kiriman membuatnya diputus di tepi jaringan sebelum kode ini sempat jalan,
+ * jadi pengunggah hanya melihat layar diam. Formulir admin memanggil action ini berurutan, sekali
+ * per foto, sehingga yang dibatasi tinggal ukuran satu foto — jumlahnya bebas. Efek sampingnya
+ * bagus: foto yang sudah terkirim tetap tersimpan walau sisanya gagal di tengah jalan.
+ *
+ * Sengaja TIDAK memanggil revalidatePath. Kalau dipanggil tiap foto, router menarik ulang halaman
+ * galeri sebanyak jumlah foto, dan tiap tarikan makin berat karena isinya bertambah. Formulir
+ * memanggil refreshGallery() sekali setelah rangkaiannya selesai.
+ */
+export async function addGalleryPhoto(form: FormData): Promise<FormState> {
   const { t } = await getI18n();
   if (!(await admin())) return { error: t.errors.denied };
   const title = String(form.get("title") ?? "").trim();
   const category = String(form.get("category") ?? "");
-  const files = form.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
+  const file = form.get("file");
+  // Nomor urut datang dari klien karena tiap request cuma melihat satu file. Hanya dipakai untuk
+  // menyusun judul, dan judulnya tetap dipotong 80 karakter di bawah, jadi tidak ada yang dipercaya.
+  const index = Number(form.get("index") ?? 0);
+  const total = Number(form.get("total") ?? 1);
 
-  if (files.length === 0) return { error: t.errors.chooseFile };
-  if (files.length > MAX_FILES_PER_UPLOAD) return { error: t.errors.tooManyFiles };
+  if (!(file instanceof File) || file.size === 0) return { error: t.errors.chooseFile };
   if (title && (title.length < 2 || title.length > 80)) return { error: t.errors.titleMin };
   if (!GALLERY_CATEGORIES.includes(category)) return { error: t.errors.optionInvalid };
 
-  // Judul kosong → diambil dari nama file. Judul diisi tapi filenya banyak → diberi nomor urut
+  const saved = await saveImage(file, MAX_GALLERY_BYTES);
+  if ("error" in saved) return { error: t.errors[saved.error] };
+
+  // Judul kosong → diambil dari nama file. Judul diisi tapi fotonya banyak → diberi nomor urut
   // supaya tiap foto tetap punya judul yang berbeda.
-  const named = (file: File, i: number) => {
-    if (!title) return titleFromFilename(file.name, t.admin.gallery.photoTitle);
-    return files.length > 1 ? `${title} ${i + 1}`.slice(0, 80) : title;
-  };
+  const named = !title
+    ? titleFromFilename(file.name, t.admin.gallery.photoTitle)
+    : total > 1
+      ? `${title} ${index + 1}`.slice(0, 80)
+      : title;
 
-  let added = 0;
-  let failure: string | null = null;
-  for (const [i, file] of files.entries()) {
-    const saved = await saveImage(file, MAX_GALLERY_BYTES);
-    if ("error" in saved) {
-      // Satu file rusak tidak membatalkan sisanya; kesalahan pertama dilaporkan di akhir.
-      failure ??= t.errors[saved.error];
-      continue;
-    }
-    await db.run("INSERT INTO gallery (title, category, src, status) VALUES (?,?,?,'approved')", named(file, i), category, saved.src);
-    added++;
-  }
+  await db.run("INSERT INTO gallery (title, category, src, status) VALUES (?,?,?,'approved')", named, category, saved.src);
+  return { ok: t.ok.photoAdded };
+}
 
+/** Dipanggil sekali setelah rangkaian unggahan selesai — alasannya ada di catatan addGalleryPhoto. */
+export async function refreshGallery() {
+  if (!(await admin())) return;
   revalidatePath("/galeri");
   revalidatePath("/admin/galeri");
   revalidatePath("/");
-  if (added === 0) return { error: failure ?? t.errors.chooseFile };
-  const ok = added === 1 ? t.ok.photoAdded : t.ok.photosAdded(added);
-  return failure ? { ok: `${ok} ${failure}` } : { ok };
 }
 
 export async function approveGalleryItem(form: FormData) {

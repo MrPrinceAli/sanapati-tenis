@@ -5,9 +5,7 @@ import path from "node:path";
 import { UPLOAD_DIR } from "./db";
 import type { ErrorCode } from "./i18n";
 
-// Vercel membatasi badan request fungsi di 4,5 MB, jadi batas upload harus di bawah itu di semua tempat.
-export const MAX_GALLERY_BYTES = 4 * 1024 * 1024;
-export const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+// Angka batasnya ada di lib/upload-limits.ts karena formulir di sisi klien memakainya juga.
 
 const MIME = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" } as const;
 
