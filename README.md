@@ -7,7 +7,9 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![SQLite](https://img.shields.io/badge/SQLite-Turso-003B57?logo=sqlite&logoColor=white)](https://turso.tech)
 
-Website komunitas tenis dengan booking lapangan online — **gratis** (tanpa harga/pembayaran), dua lapangan: **Sawangan** dan **Ragunan**, dua bahasa (Indonesia/Inggris). Next.js 15 (App Router) + TypeScript + Tailwind CSS v4 + SQLite (file lokal, atau Turso di produksi).
+Platform komunitas tenis **open-source** untuk klub dan komunitas di Indonesia: booking lapangan online, jadwal publik, mabar / matchmaking, turnamen, profil pemain, galeri, dan dashboard admin. Booking bersifat gratis (tanpa fitur harga/pembayaran), dua bahasa (Indonesia/Inggris), dan jumlah lapangan bebas diatur dari admin. Next.js 15 (App Router) + TypeScript + Tailwind CSS v4 + SQLite (file lokal, atau Turso di produksi).
+
+_An open-source tennis community platform: court booking, public schedules, matchmaking, tournaments, player profiles, gallery, and an admin dashboard. Built for tennis clubs and communities in Indonesia. Fork it or use it as a template for your own club._
 
 > **Live:** https://sanapati-tenis.vercel.app
 
@@ -101,7 +103,7 @@ Cek bentrok + insert berjalan dalam satu transaksi SQLite, jadi dua orang tidak 
 
 ## Jadwal rutin mingguan
 
-Untuk sesi tetap klub (mis. Selasa & Jumat 16.00–22.00 di Sawangan), admin mengaturnya sekali di **Lapangan & Blokir → Jadwal rutin mingguan**.
+Untuk sesi tetap klub (mis. Selasa & Jumat 16.00–22.00 di salah satu lapangan), admin mengaturnya sekali di **Lapangan & Blokir → Jadwal rutin mingguan**.
 
 - Aturan disimpan sebagai pola (`recurring_blocks`: lapangan + hari + jam), lalu dihitung saat halaman dirender — bukan dibuat sebagai ribuan baris booking.
   Jadi berlaku terus ke depan tanpa cron dan tanpa perlu diisi ulang.
