@@ -205,3 +205,7 @@ npm run build && npm run start     # set DATA_DIR ke volume persisten bila perlu
 - Galeri: pengunjung boleh mengirim foto tanpa akun, tapi selalu lewat antrean persetujuan admin
   (bisa dimatikan di Pengaturan). Belum ada pagination — semua foto dimuat sekaligus
 - Mabar: pemain berupa teks bebas, belum terhubung ke akun/profil pemain; turnamen baru sistem gugur (belum ada round-robin / perebutan juara 3)
+
+## Lisensi
+
+[MIT](LICENSE)
