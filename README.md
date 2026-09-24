@@ -1,5 +1,12 @@
 # Sanapati Tenis
 
+[![Deploy](https://img.shields.io/github/deployments/MrPrinceAli/sanapati-tenis/Production?label=vercel&logo=vercel)](https://sanapati-tenis.vercel.app)
+[![License](https://img.shields.io/github/license/MrPrinceAli/sanapati-tenis)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![SQLite](https://img.shields.io/badge/SQLite-Turso-003B57?logo=sqlite&logoColor=white)](https://turso.tech)
+
 Website komunitas tenis dengan booking lapangan online — **gratis** (tanpa harga/pembayaran), dua lapangan: **Sawangan** dan **Ragunan**, dua bahasa (Indonesia/Inggris). Next.js 15 (App Router) + TypeScript + Tailwind CSS v4 + SQLite (file lokal, atau Turso di produksi).
 
 > **Live:** https://sanapati-tenis.vercel.app
