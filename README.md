@@ -1,17 +1,58 @@
+<div align="center">
+
+<img src="docs/logo.svg" alt="Logo Sanapati Tenis" width="120" />
+
 # Sanapati Tenis
 
+### Platform komunitas tenis open-source: booking lapangan, jadwal, mabar, dan turnamen dalam satu tempat.
+
+[![CI](https://github.com/MrPrinceAli/sanapati-tenis/actions/workflows/ci.yml/badge.svg)](https://github.com/MrPrinceAli/sanapati-tenis/actions/workflows/ci.yml)
 [![Deploy](https://img.shields.io/github/deployments/MrPrinceAli/sanapati-tenis/Production?label=vercel&logo=vercel)](https://sanapati-tenis.vercel.app)
-[![License](https://img.shields.io/github/license/MrPrinceAli/sanapati-tenis)](LICENSE)
+[![License: MIT](https://img.shields.io/github/license/MrPrinceAli/sanapati-tenis?color=d8f24b&labelColor=0e3b2c)](LICENSE)
+[![Live demo](https://img.shields.io/badge/live-sanapati--tenis.vercel.app-0e3b2c?logo=vercel&logoColor=white)](https://sanapati-tenis.vercel.app)
+[![Last commit](https://img.shields.io/github/last-commit/MrPrinceAli/sanapati-tenis)](https://github.com/MrPrinceAli/sanapati-tenis/commits/main)
+[![PRs welcome](https://img.shields.io/badge/PR-welcome-d8f24b?labelColor=0e3b2c)](CONTRIBUTING.md)
+
 [![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![SQLite](https://img.shields.io/badge/SQLite-Turso-003B57?logo=sqlite&logoColor=white)](https://turso.tech)
+[![i18n](https://img.shields.io/badge/i18n-ID_%7C_EN-0e3b2c)](src/lib/i18n.ts)
+
+[**Demo langsung**](https://sanapati-tenis.vercel.app) · [**Tampilan**](#tampilan) · [**Fitur**](#fitur) · [**Menjalankan**](#menjalankan) · [**Deploy**](#deploy)
+
+</div>
+
+---
 
 Platform komunitas tenis **open-source** untuk klub dan komunitas di Indonesia: booking lapangan online, jadwal publik, mabar / matchmaking, turnamen, profil pemain, galeri, dan dashboard admin. Booking bersifat gratis (tanpa fitur harga/pembayaran), dua bahasa (Indonesia/Inggris), dan jumlah lapangan bebas diatur dari admin. Next.js 15 (App Router) + TypeScript + Tailwind CSS v4 + SQLite (file lokal, atau Turso di produksi).
 
 _An open-source tennis community platform: court booking, public schedules, matchmaking, tournaments, player profiles, gallery, and an admin dashboard. Built for tennis clubs and communities in Indonesia. Fork it or use it as a template for your own club._
 
-> **Live:** https://sanapati-tenis.vercel.app
+| 🎾 Booking real-time | 📅 Jadwal publik | 🤝 Mabar & turnamen | 🛠️ Admin lengkap |
+|:---:|:---:|:---:|:---:|
+| Papan lapangan × jam, anti double booking | Kalender bulanan + detail per jam | Acak pasangan adil, skor & klasemen otomatis | Booking, lapangan, jadwal rutin, pengguna |
+
+<details>
+<summary><b>Daftar isi</b></summary>
+
+- [Tampilan](#tampilan)
+- [Menjalankan](#menjalankan)
+- [Fitur](#fitur)
+- [Admin](#admin)
+- [Aturan bisnis](#aturan-bisnis)
+- [Jadwal rutin mingguan](#jadwal-rutin-mingguan)
+- [Mabar / matchmaking](#mabar--matchmaking)
+- [Landing page scroll-driven](#landing-page-scroll-driven)
+- [Dua bahasa (i18n)](#dua-bahasa-i18n)
+- [Struktur](#struktur)
+- [Tes](#tes)
+- [Deploy](#deploy)
+- [Belum termasuk](#belum-termasuk)
+- [Lisensi](#lisensi)
+
+</details>
 
 ## Tampilan
 
